@@ -7,6 +7,7 @@ directory. Existing evaluation artifacts are never overwritten.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import time
 from pathlib import Path
@@ -20,7 +21,7 @@ from src.models.temporal.tgat_dataset import ALL_FEATURES, EventFeatureStore, TA
 from src.models.temporal.train_tgat import evaluate, populate_history, predict, read_frame
 
 
-RESULTS_DIR = Path("results/ablations/a0_baseline_control")
+DEFAULT_RESULTS_DIR = Path("results/ablations/a0_baseline_control")
 OUTPUT_NAMES = (
     "metrics.json",
     "validation_predictions.csv",
@@ -29,15 +30,29 @@ OUTPUT_NAMES = (
 
 
 def main() -> None:
-    config_path = RESULTS_DIR / "config.json"
-    checkpoint_path = RESULTS_DIR / "model.pt"
+    parser = argparse.ArgumentParser(
+        description="Recover validation/test metrics for an existing TGAT checkpoint without retraining."
+    )
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=DEFAULT_results_dir,
+        help=(
+            "Directory containing config.json and model.pt. "
+            "Defaults to results/ablations/a0_baseline_control."
+        ),
+    )
+    results_dir = parser.parse_args().results_dir
+
+    config_path = results_dir / "config.json"
+    checkpoint_path = results_dir / "model.pt"
 
     if not config_path.is_file():
         raise FileNotFoundError(f"Missing config: {config_path}")
     if not checkpoint_path.is_file():
         raise FileNotFoundError(f"Missing checkpoint: {checkpoint_path}")
 
-    existing = [name for name in OUTPUT_NAMES if (RESULTS_DIR / name).exists()]
+    existing = [name for name in OUTPUT_NAMES if (results_dir / name).exists()]
     if existing:
         raise FileExistsError(
             "Refusing to overwrite existing recovery outputs: "
@@ -162,17 +177,17 @@ def main() -> None:
     temp_paths: list[Path] = []
     try:
         for name, text in outputs.items():
-            temp = RESULTS_DIR / (name + ".recovering")
+            temp = results_dir / (name + ".recovering")
             temp.write_text(text, encoding="utf-8")
             temp_paths.append(temp)
         for name, frame in prediction_frames.items():
-            temp = RESULTS_DIR / (name + ".recovering")
+            temp = results_dir / (name + ".recovering")
             frame.to_csv(temp, index=False)
             temp_paths.append(temp)
 
         for name in OUTPUT_NAMES:
-            temp = RESULTS_DIR / (name + ".recovering")
-            temp.replace(RESULTS_DIR / name)
+            temp = results_dir / (name + ".recovering")
+            temp.replace(results_dir / name)
             temp_paths.remove(temp)
     finally:
         for temp in temp_paths:
