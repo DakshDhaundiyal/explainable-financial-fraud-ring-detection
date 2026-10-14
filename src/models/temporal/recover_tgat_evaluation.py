@@ -36,7 +36,7 @@ def main() -> None:
     parser.add_argument(
         "--results-dir",
         type=Path,
-        default=DEFAULT_results_dir,
+        default=DEFAULT_RESULTS_DIR,
         help=(
             "Directory containing config.json and model.pt. "
             "Defaults to results/ablations/a0_baseline_control."
