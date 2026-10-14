@@ -1,0 +1,194 @@
+Folder PATH listing for volume Windows
+Volume serial number is 5A31-798A
+C:.
+|   .gitignore
+|   notebooks
+|   project_structure.txt
+|   README.md
+|   requirements.txt
+|   tests
+|   tests_phase9.py
+|   tests_tgat.py
+|   
++---configs
+|   |   tgat.json
+|   |   
+|   \---baselines
+|           logistic_regression.json
+|           static_gcn.json
+|           xgboost.json
+|           
++---data
+|   +---interim
+|   |       .gitkeep
+|   |       
+|   +---processed
+|   |       .gitkeep
+|   |       
+|   \---raw
+|           .gitkeep
+|           
++---data_audit
+|       audit.py
+|       audit_report.md
+|       
++---docs
+|       data_preprocessing.md
+|       feature_engineering.md
+|       graph_analysis.md
+|       graph_construction.md
+|       phase_9_11_runbook.md
+|       temporal_processing.md
+|       
++---paper_evidence
+|   \---results
+|           baseline_results.csv
+|           
++---results
+|   +---ablations
+|   |   \---a1_no_temporal_features
+|   |           config.json
+|   |           metrics.json
+|   |           model.pt
+|   |           test_predictions.csv
+|   |           training_log.json
+|   |           validation_predictions.csv
+|   |           
+|   +---baselines
+|   |   +---logistic_regression
+|   |   |   |   config.json
+|   |   |   |   metrics.json
+|   |   |   |   model.joblib
+|   |   |   |   predictions_test.csv
+|   |   |   |   predictions_validation.csv
+|   |   |   |   
+|   |   |   \---plots
+|   |   +---static_gcn
+|   |   |       metrics.json
+|   |   |       model.pt
+|   |   |       test_predictions.csv
+|   |   |       validation_predictions.csv
+|   |   |       
+|   |   +---temporal_xgboost
+|   |   |       metrics.json
+|   |   |       model.json
+|   |   |       test_predictions.csv
+|   |   |       validation_predictions.csv
+|   |   |       
+|   |   \---xgboost
+|   |           config.json
+|   |           feature_importance.csv
+|   |           metrics.json
+|   |           model.json
+|   |           predictions_test.csv
+|   |           predictions_validation.csv
+|   |           
+|   +---tgat
+|   |       config.json
+|   |       metrics.json
+|   |       model.pt
+|   |       test_predictions.csv
+|   |       training_log.json
+|   |       validation_predictions.csv
+|   |       
+|   +---tgat_official_primary
+|   |       config.json
+|   |       metrics.json
+|   |       model.pt
+|   |       test_predictions.csv
+|   |       training_log.json
+|   |       validation_predictions.csv
+|   |       
+|   +---tgat_opt2_branch_benchmark
+|   |       config.json
+|   |       metrics.json
+|   |       model.pt
+|   |       test_predictions.csv
+|   |       training_log.json
+|   |       validation_predictions.csv
+|   |       
+|   +---tgat_opt2_main_benchmark
+|   |       config.json
+|   |       metrics.json
+|   |       model.pt
+|   |       test_predictions.csv
+|   |       training_log.json
+|   |       validation_predictions.csv
+|   |       
+|   +---tgat_opt2_verification
+|   |       config.json
+|   |       metrics.json
+|   |       model.pt
+|   |       test_predictions.csv
+|   |       training_log.json
+|   |       validation_predictions.csv
+|   |       
+|   \---tgat_runtime_benchmark
+|           config.json
+|           metrics.json
+|           model.pt
+|           test_predictions.csv
+|           training_log.json
+|           validation_predictions.csv
+|           
++---scripts
+|       tgat_sanity.py
+|       
++---src
+|   |   explainability
+|   |   
+|   +---analysis
+|   |       threshold_analysis.py
+|   |       
+|   +---data
+|   |       create_modeling_splits.py
+|   |       leakage_validation.py
+|   |       preprocess.py
+|   |       temporal_processing.py
+|   |       temporal_split.py
+|   |       
+|   +---features
+|   |       feature_engineering.py
+|   |       
+|   +---graph
+|   |       analyze_graph.py
+|   |       build_graph.py
+|   |       
+|   \---models
+|       |   __init__.py
+|       |   
+|       +---baselines
+|       |       logistic_regression.py
+|       |       temporal_xgboost.py
+|       |       xgboost_baseline.py
+|       |       __init__.py
+|       |       
+|       +---common
+|       |       data_loader.py
+|       |       evaluation.py
+|       |       __init__.py
+|       |       
+|       +---gnn
+|       |       static_gcn.py
+|       |       train_static_gcn.py
+|       |       __init__.py
+|       |       
+|       +---graph
+|       |       build_static_graph.py
+|       |       __init__.py
+|       |       
+|       \---temporal
+|               build_temporal_features.py
+|               evaluate_future.py
+|               feature_scaler.py
+|               temporal_dataset.py
+|               temporal_neighbor_store.py
+|               temporal_state.py
+|               tgat_core.py
+|               tgat_dataset.py
+|               train_tgat.py
+|               __init__.py
+|               
+\---tools
+        profile_tgat_runtime.py
+        
