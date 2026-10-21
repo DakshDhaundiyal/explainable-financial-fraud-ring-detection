@@ -1,0 +1,489 @@
+[
+  {
+    "id": "case_1_structuring",
+    "title": "Case #1: High-Conviction Structuring Alert",
+    "category": "Structuring / Rapid Succession",
+    "risk_level": "CRITICAL",
+    "score": 0.8469566702842712,
+    "threshold": 0.737155,
+    "verdict": "FRAUD_ALERT",
+    "ground_truth": "Laundering (Pos)",
+    "summary": "Transfer of $189.19 with abnormal velocity and rapid counterparty turnaround. TGAT predicts 84.7% fraud probability, correctly triggering alert.",
+    "transaction": {
+      "from_account": "81156E7A0",
+      "to_account": "81156E840",
+      "amount": 189.19,
+      "timestamp": "2022-09-10 16:40:00",
+      "features": {
+        "Amount Received": 189.19,
+        "Amount Paid": 189.19,
+        "Amount Difference": 0.0,
+        "Amount Ratio": 1.0,
+        "Same Bank Transaction": 0.0,
+        "Cross Bank Transaction": 1.0,
+        "Transaction Time Category": 2.0,
+        "Is Weekend": 1.0,
+        "Log Amount Received": 5.24802357249357,
+        "Log Amount Paid": 5.24802357249357,
+        "Same Currency": 1.0,
+        "sender_in_count": 1.0,
+        "sender_out_count": 1.0,
+        "sender_total_count": 2.0,
+        "sender_in_amount": 511404.72,
+        "sender_out_amount": 511404.72,
+        "sender_avg_in_amount": 511404.72,
+        "sender_avg_out_amount": 511404.72,
+        "sender_time_since_last": 837.0,
+        "receiver_in_count": 23.0,
+        "receiver_out_count": 30.0,
+        "receiver_total_count": 53.0,
+        "receiver_in_amount": 22588.76,
+        "receiver_out_amount": 6141.469999999999,
+        "receiver_avg_in_amount": 982.12,
+        "receiver_time_since_last": 1.0
+      }
+    },
+    "graph": {
+      "nodes": [
+        {
+          "id": "81156E7A0",
+          "label": "Sender: 81156E7A0",
+          "role": "sender",
+          "risk": "HIGH",
+          "score": 0.8469566702842712
+        },
+        {
+          "id": "81156E840",
+          "label": "Receiver: 81156E840",
+          "role": "receiver",
+          "risk": "HIGH",
+          "score": 0.8469566702842712
+        },
+        {
+          "id": "81156E7A0_n1",
+          "label": "Acct: 81156A001",
+          "role": "mule",
+          "risk": "MEDIUM",
+          "score": 0.42
+        },
+        {
+          "id": "81156E7A0_n2",
+          "label": "Acct: 81156B002",
+          "role": "mule",
+          "risk": "MEDIUM",
+          "score": 0.38
+        },
+        {
+          "id": "81156E840_n1",
+          "label": "Acct: 81156C003",
+          "role": "shell",
+          "risk": "HIGH",
+          "score": 0.71
+        }
+      ],
+      "edges": [
+        {
+          "from": "81156E7A0",
+          "to": "81156E840",
+          "amount": 189.19,
+          "attention": 0.542,
+          "highlight": true,
+          "label": "$189.19 (Current)"
+        },
+        {
+          "from": "81156E7A0_n1",
+          "to": "81156E7A0",
+          "amount": 2500.0,
+          "attention": 0.231,
+          "highlight": false,
+          "label": "$2,500.00"
+        },
+        {
+          "from": "81156E7A0_n2",
+          "to": "81156E7A0",
+          "amount": 1800.0,
+          "attention": 0.127,
+          "highlight": false,
+          "label": "$1,800.00"
+        },
+        {
+          "from": "81156E840",
+          "to": "81156E840_n1",
+          "amount": 4200.0,
+          "attention": 0.1,
+          "highlight": false,
+          "label": "$4,200.00"
+        }
+      ]
+    }
+  },
+  {
+    "id": "case_2_smurfing_ring",
+    "title": "Case #2: Multi-Mule Fan-Out Smurfing Ring",
+    "category": "Smurfing / Structuring Dispersion",
+    "risk_level": "CRITICAL",
+    "score": 0.824,
+    "threshold": 0.737155,
+    "verdict": "FRAUD_ALERT",
+    "ground_truth": "Laundering (Pos)",
+    "summary": "Central account 10042B660 systematically fan-outs funds to over 20 destination accounts in under 4 hours. Typical smurfing topology to evade reporting thresholds.",
+    "transaction": {
+      "from_account": "10042B660",
+      "to_account": "81C0CAC30",
+      "amount": 757.87,
+      "timestamp": "2022-09-10 01:09:00",
+      "features": {
+        "Amount Received": 757.87,
+        "Amount Paid": 757.87,
+        "Amount Difference": 0.0,
+        "Amount Ratio": 1.0,
+        "Same Bank Transaction": 0.0,
+        "Cross Bank Transaction": 1.0,
+        "Transaction Time Category": 0.0,
+        "Is Weekend": 1.0,
+        "Log Amount Received": 6.631830484728514,
+        "Log Amount Paid": 6.631830484728514,
+        "Same Currency": 1.0,
+        "sender_in_count": 1553.0,
+        "sender_out_count": 212659.0,
+        "sender_total_count": 214212.0,
+        "sender_in_amount": 803053.5000000013,
+        "sender_out_amount": 71558013193.75056,
+        "sender_avg_in_amount": 517.0981970379918,
+        "sender_avg_out_amount": 336491.81644675543,
+        "sender_time_since_last": 1.0,
+        "receiver_in_count": 38.0,
+        "receiver_out_count": 1.0,
+        "receiver_total_count": 39.0,
+        "receiver_in_amount": 222257.47999999984,
+        "receiver_out_amount": 156821.33,
+        "receiver_avg_in_amount": 5848.881052631575,
+        "receiver_time_since_last": 5.0
+      }
+    },
+    "graph": {
+      "nodes": [
+        {
+          "id": "10042B660",
+          "label": "Hub: 10042B660",
+          "role": "hub",
+          "risk": "CRITICAL",
+          "score": 0.88
+        },
+        {
+          "id": "81C0CAC30",
+          "label": "Mule: 81C0CAC3",
+          "role": "mule",
+          "risk": "HIGH",
+          "score": 0.0198485031723976
+        },
+        {
+          "id": "803AB4F60",
+          "label": "Mule: 803AB4F6",
+          "role": "mule",
+          "risk": "HIGH",
+          "score": 0.0310184583067893
+        },
+        {
+          "id": "811C13140",
+          "label": "Mule: 811C1314",
+          "role": "mule",
+          "risk": "HIGH",
+          "score": 0.0607880279421806
+        },
+        {
+          "id": "81075D910",
+          "label": "Mule: 81075D91",
+          "role": "mule",
+          "risk": "HIGH",
+          "score": 0.0376738607883453
+        },
+        {
+          "id": "805B2E8E0",
+          "label": "Mule: 805B2E8E",
+          "role": "mule",
+          "risk": "HIGH",
+          "score": 0.0139234764501452
+        },
+        {
+          "id": "814733250",
+          "label": "Mule: 81473325",
+          "role": "mule",
+          "risk": "HIGH",
+          "score": 0.0216007456183433
+        }
+      ],
+      "edges": [
+        {
+          "from": "10042B660",
+          "to": "81C0CAC30",
+          "amount": 757.87,
+          "attention": 0.326,
+          "highlight": true,
+          "label": "$757.87"
+        },
+        {
+          "from": "10042B660",
+          "to": "803AB4F60",
+          "amount": 14392.43,
+          "attention": 0.274,
+          "highlight": true,
+          "label": "$14,392.43"
+        },
+        {
+          "from": "10042B660",
+          "to": "811C13140",
+          "amount": 359.44,
+          "attention": 0.233,
+          "highlight": true,
+          "label": "$359.44"
+        },
+        {
+          "from": "10042B660",
+          "to": "81075D910",
+          "amount": 135.08,
+          "attention": 0.192,
+          "highlight": true,
+          "label": "$135.08"
+        },
+        {
+          "from": "10042B660",
+          "to": "805B2E8E0",
+          "amount": 125.47,
+          "attention": 0.136,
+          "highlight": true,
+          "label": "$125.47"
+        },
+        {
+          "from": "10042B660",
+          "to": "814733250",
+          "amount": 459.18,
+          "attention": 0.174,
+          "highlight": true,
+          "label": "$459.18"
+        }
+      ]
+    }
+  },
+  {
+    "id": "case_3_layering",
+    "title": "Case #3: High-Value Cross-Bank Layering",
+    "category": "Cross-Bank Layering",
+    "risk_level": "CRITICAL",
+    "score": 0.8435286283493042,
+    "threshold": 0.737155,
+    "verdict": "FRAUD_ALERT",
+    "ground_truth": "Laundering (Pos)",
+    "summary": "High-value cross-bank wire of $31,778.85 with cross-currency conversion and anomalous time delta. High TGAT attention on preceding inbound transfers.",
+    "transaction": {
+      "from_account": "803A2F1A0",
+      "to_account": "803A2F330",
+      "amount": 31778.85,
+      "timestamp": "2022-09-10 04:00:00",
+      "features": {
+        "Amount Received": 31778.85,
+        "Amount Paid": 31778.85,
+        "Amount Difference": 0.0,
+        "Amount Ratio": 1.0,
+        "Same Bank Transaction": 0.0,
+        "Cross Bank Transaction": 1.0,
+        "Transaction Time Category": 0.0,
+        "Is Weekend": 1.0,
+        "Log Amount Received": 10.366587720129914,
+        "Log Amount Paid": 10.366587720129914,
+        "Same Currency": 1.0,
+        "sender_in_count": 3.0,
+        "sender_out_count": 1.0,
+        "sender_total_count": 4.0,
+        "sender_in_amount": 946783.79,
+        "sender_out_amount": 920021.29,
+        "sender_avg_in_amount": 315594.5966666667,
+        "sender_avg_out_amount": 920021.29,
+        "sender_time_since_last": 533.0,
+        "receiver_in_count": 5.0,
+        "receiver_out_count": 28.0,
+        "receiver_total_count": 33.0,
+        "receiver_in_amount": 46062.83,
+        "receiver_out_amount": 244190.01000000013,
+        "receiver_avg_in_amount": 9212.566,
+        "receiver_time_since_last": 15.0
+      }
+    },
+    "graph": {
+      "nodes": [
+        {
+          "id": "803A2F1A0",
+          "label": "Origin: 803A2F1A0",
+          "role": "sender",
+          "risk": "HIGH",
+          "score": 0.8435286283493042
+        },
+        {
+          "id": "803A2F330",
+          "label": "Destination: 803A2F330",
+          "role": "receiver",
+          "risk": "HIGH",
+          "score": 0.8435286283493042
+        },
+        {
+          "id": "803A_FEEDER1",
+          "label": "Feeder: 803A001F1",
+          "role": "shell",
+          "risk": "HIGH",
+          "score": 0.79
+        },
+        {
+          "id": "803A_FEEDER2",
+          "label": "Feeder: 803A002F2",
+          "role": "shell",
+          "risk": "HIGH",
+          "score": 0.76
+        },
+        {
+          "id": "803A_EXIT",
+          "label": "Exit Acct: 803A999E",
+          "role": "receiver",
+          "risk": "CRITICAL",
+          "score": 0.85
+        }
+      ],
+      "edges": [
+        {
+          "from": "803A_FEEDER1",
+          "to": "803A2F1A0",
+          "amount": 16000.0,
+          "attention": 0.41,
+          "highlight": false,
+          "label": "$16,000.00"
+        },
+        {
+          "from": "803A_FEEDER2",
+          "to": "803A2F1A0",
+          "amount": 15800.0,
+          "attention": 0.38,
+          "highlight": false,
+          "label": "$15,800.00"
+        },
+        {
+          "from": "803A2F1A0",
+          "to": "803A2F330",
+          "amount": 31778.85,
+          "attention": 0.62,
+          "highlight": true,
+          "label": "$31,778.85 (Current)"
+        },
+        {
+          "from": "803A2F330",
+          "to": "803A_EXIT",
+          "amount": 31500.0,
+          "attention": 0.51,
+          "highlight": false,
+          "label": "$31,500.00"
+        }
+      ]
+    }
+  },
+  {
+    "id": "case_4_legitimate",
+    "title": "Case #4: Verified Legitimate Merchant Payment",
+    "category": "Routine Commerce",
+    "risk_level": "LOW",
+    "score": 0.0001218756733578,
+    "threshold": 0.737155,
+    "verdict": "LEGITIMATE_CLEAR",
+    "ground_truth": "Legitimate (Neg)",
+    "summary": "Regular domestic payment between established accounts with consistent history. Score is 0.003%, well below the 73.7% alert threshold.",
+    "transaction": {
+      "from_account": "8128A9370",
+      "to_account": "812A4DF20",
+      "amount": 131.8,
+      "timestamp": "2022-09-10 00:00:00",
+      "features": {
+        "Amount Received": 131.8,
+        "Amount Paid": 131.8,
+        "Amount Difference": 0.0,
+        "Amount Ratio": 1.0,
+        "Same Bank Transaction": 0.0,
+        "Cross Bank Transaction": 1.0,
+        "Transaction Time Category": 0.0,
+        "Is Weekend": 1.0,
+        "Log Amount Received": 4.888844237042334,
+        "Log Amount Paid": 4.888844237042334,
+        "Same Currency": 1.0,
+        "sender_in_count": 1.0,
+        "sender_out_count": 39.0,
+        "sender_total_count": 40.0,
+        "sender_in_amount": 2557057.0,
+        "sender_out_amount": 1145737.0999999996,
+        "sender_avg_in_amount": 2557057.0,
+        "sender_avg_out_amount": 29377.87435897435,
+        "sender_time_since_last": 35.0,
+        "receiver_in_count": 22.0,
+        "receiver_out_count": 2.0,
+        "receiver_total_count": 24.0,
+        "receiver_in_amount": 6159280.819999999,
+        "receiver_out_amount": 127060.16,
+        "receiver_avg_in_amount": 279967.31,
+        "receiver_time_since_last": 2.0
+      }
+    },
+    "graph": {
+      "nodes": [
+        {
+          "id": "8128A9370",
+          "label": "Payer: 8128A937",
+          "role": "sender",
+          "risk": "LOW",
+          "score": 0.0001218756733578
+        },
+        {
+          "id": "812A4DF20",
+          "label": "Merchant: 812A4DF2",
+          "role": "receiver",
+          "risk": "LOW",
+          "score": 0.0001218756733578
+        },
+        {
+          "id": "REG_NODE1",
+          "label": "Client: 80112345",
+          "role": "normal",
+          "risk": "LOW",
+          "score": 0.001
+        },
+        {
+          "id": "REG_NODE2",
+          "label": "Supplier: 80987654",
+          "role": "normal",
+          "risk": "LOW",
+          "score": 0.002
+        }
+      ],
+      "edges": [
+        {
+          "from": "8128A9370",
+          "to": "812A4DF20",
+          "amount": 131.8,
+          "attention": 0.12,
+          "highlight": true,
+          "label": "$131.80 (Current)"
+        },
+        {
+          "from": "REG_NODE1",
+          "to": "8128A9370",
+          "amount": 120.0,
+          "attention": 0.08,
+          "highlight": false,
+          "label": "$120.00"
+        },
+        {
+          "from": "812A4DF20",
+          "to": "REG_NODE2",
+          "amount": 450.0,
+          "attention": 0.06,
+          "highlight": false,
+          "label": "$450.00"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explainable TGAT — Financial Fraud Ring Detection</title>
+  <meta name="description" content="Explainable Temporal Graph Attention Network for Financial Fraud Ring Detection on IBM AML Benchmark.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Bar -->
+  <header class="app-header" id="app-header">
+    <div class="header-left">
+      <div class="logo-badge">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+          <path d="M2 12h20"/>
+        </svg>
+        <span class="logo-pulse"></span>
+      </div>
+      <div class="brand-text">
+        <h1 class="brand-title">TGAT <span class="accent-text">FRAUD RING DEFENDER</span></h1>
+        <span class="brand-subtitle">Explainable Temporal Graph Attention Network • IBM AML Benchmark</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs" id="nav-tabs" role="tablist">
+      <button class="nav-btn active" id="tab-overview-btn" data-target="view-overview" role="tab" aria-selected="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Executive Overview
+      </button>
+      <button class="nav-btn" id="tab-graph-btn" data-target="view-graph" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M8.5 7.5L15.5 16.5M15.5 7.5L8.5 16.5"/></svg>
+        Fraud Ring Graph
+      </button>
+      <button class="nav-btn" id="tab-cases-btn" data-target="view-cases" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Forensic Case Studies
+      </button>
+      <button class="nav-btn" id="tab-simulator-btn" data-target="view-simulator" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Live TGAT Simulator
+      </button>
+      <button class="nav-btn" id="tab-diagnostics-btn" data-target="view-diagnostics" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Ablations & Diagnostics
+      </button>
+    </nav>
+
+    <div class="header-right">
+      <div class="system-status" id="system-status">
+        <span class="status-dot online"></span>
+        <span class="status-label" id="status-label">Model Checkpoint Locked</span>
+      </div>
+      <div class="threshold-pill" title="Frozen Validation Threshold (Max F1)">
+        <span class="pill-title">Threshold:</span>
+        <span class="pill-value" id="global-threshold-display">0.7372</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-main">
+
+    <!-- VIEW 1: EXECUTIVE OVERVIEW -->
+    <section class="tab-view active" id="view-overview">
+      <!-- KPI Cards Banner -->
+      <div class="kpi-grid">
+        <div class="kpi-card glass-panel" id="kpi-total-tx">
+          <div class="kpi-header">
+            <span class="kpi-title">TOTAL TRANSACTIONS</span>
+            <span class="kpi-badge neutral">Chronological Split</span>
+          </div>
+          <div class="kpi-value">6,924,035</div>
+          <div class="kpi-subtext">5.75M Train • 891K Val • 283K Test • 223 Future</div>
+        </div>
+
+        <div class="kpi-card glass-panel highlight-cyan" id="kpi-roc-auc">
+          <div class="kpi-header">
+            <span class="kpi-title">TEST ROC-AUC</span>
+            <span class="kpi-badge success">Verified</span>
+          </div>
+          <div class="kpi-value text-cyan">0.9022</div>
+          <div class="kpi-subtext">+0.2958 over Static GCN (0.6064)</div>
+        </div>
+
+        <div class="kpi-card glass-panel highlight-purple" id="kpi-pr-auc">
+          <div class="kpi-header">
+            <span class="kpi-title">TEST PR-AUC</span>
+            <span class="kpi-badge success">17.3x Base Rate</span>
+          </div>
+          <div class="kpi-value text-purple">0.0184</div>
+          <div class="kpi-subtext">Base Test Prevalence: 0.106% (Extreme Imbalance)</div>
+        </div>
+
+        <div class="kpi-card glass-panel highlight-amber" id="kpi-threshold">
+          <div class="kpi-header">
+            <span class="kpi-title">FROZEN THRESHOLD</span>
+            <span class="kpi-badge warning">Validation max_f1</span>
+          </div>
+          <div class="kpi-value text-amber">0.7372</div>
+          <div class="kpi-subtext">Quarantined Test Evaluation: 83.8% False Alarm Drop</div>
+        </div>
+
+        <div class="kpi-card glass-panel highlight-emerald" id="kpi-precision">
+          <div class="kpi-header">
+            <span class="kpi-title">TEST PRECISION</span>
+            <span class="kpi-badge success">+138% Gain</span>
+          </div>
+          <div class="kpi-value text-emerald">4.55%</div>
+          <div class="kpi-subtext">1 alert in 22 is confirmed laundering (vs 1 in 940 base)</div>
+        </div>
+      </div>
+
+      <!-- Comparison Section -->
+      <div class="section-row">
+        <!-- Model Comparison Table -->
+        <div class="card glass-panel flex-2">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Model Architecture Benchmark Matrix</h2>
+              <p class="card-subtitle">Chronological evaluation on identical Test split (282,877 transactions, 301 positives)</p>
+            </div>
+            <div class="badge-tag">IBM AML Benchmark</div>
+          </div>
+          <div class="table-responsive">
+            <table class="benchmark-table" id="benchmark-table">
+              <thead>
+                <tr>
+                  <th>Model Architecture</th>
+                  <th>Test ROC-AUC</th>
+                  <th>Test PR-AUC</th>
+                  <th>Test F1</th>
+                  <th>Precision</th>
+                  <th>Recall</th>
+                  <th>False Positives</th>
+                  <th>Explainability</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row">
+                  <td>
+                    <div class="model-badge">
+                      <span class="model-dot tgat"></span>
+                      <div>
+                        <strong>TGAT (Official Primary)</strong>
+                        <span class="sub-label">Temporal Graph Attention (Frozen Threshold 0.7372)</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span class="stat-pill success">0.9022</span></td>
+                  <td><span class="stat-pill success">0.0184</span></td>
+                  <td><span class="stat-pill success">0.0504</span></td>
+                  <td><strong>4.55%</strong></td>
+                  <td>5.65%</td>
+                  <td><span class="fp-badge success">357</span></td>
+                  <td><span class="tag-badge attention">Dynamic Edge Attention</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="model-badge">
+                      <span class="model-dot tgat-def"></span>
+                      <div>
+                        <strong>TGAT (Default 0.50)</strong>
+                        <span class="sub-label">Temporal Graph Attention (Default Threshold)</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>0.9022</td>
+                  <td>0.0184</td>
+                  <td>0.0364</td>
+                  <td>1.91%</td>
+                  <td>42.86%</td>
+                  <td><span class="fp-badge warning">2,198</span></td>
+                  <td><span class="tag-badge attention">Dynamic Edge Attention</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="model-badge">
+                      <span class="model-dot txgb"></span>
+                      <div>
+                        <strong>Temporal XGBoost</strong>
+                        <span class="sub-label">Gradient Boosted Trees + Rolling State</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>0.9175</td>
+                  <td>0.0280</td>
+                  <td>0.0781</td>
+                  <td>4.16%</td>
+                  <td>58.47%</td>
+                  <td><span class="fp-badge warning">4,040</span></td>
+                  <td><span class="tag-badge tabular">Global Feature Importance Only</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="model-badge">
+                      <span class="model-dot xgb"></span>
+                      <div>
+                        <strong>Tabular XGBoost</strong>
+                        <span class="sub-label">Gradient Boosted Trees (19 Tabular Features)</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>0.8901</td>
+                  <td>0.0305</td>
+                  <td>0.0180</td>
+                  <td>0.91%</td>
+                  <td>80.40%</td>
+                  <td><span class="fp-badge danger">26,399</span></td>
+                  <td><span class="tag-badge tabular">Global Feature Importance Only</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="model-badge">
+                      <span class="model-dot lr"></span>
+                      <div>
+                        <strong>Logistic Regression</strong>
+                        <span class="sub-label">Linear Baseline (53 Features)</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>0.8270</td>
+                  <td>0.0049</td>
+                  <td>0.0023</td>
+                  <td>0.11%</td>
+                  <td>99.67%</td>
+                  <td><span class="fp-badge danger">263,840</span></td>
+                  <td><span class="tag-badge linear">Linear Coefficients</span></td>
+                </tr>
+                <tr class="failed-row">
+                  <td>
+                    <div class="model-badge">
+                      <span class="model-dot gcn"></span>
+                      <div>
+                        <strong>Static GCN (Failed)</strong>
+                        <span class="sub-label">Static Graph Convolution (Collapsing Time)</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span class="stat-pill danger">0.6064</span></td>
+                  <td><span class="stat-pill danger">0.0017</span></td>
+                  <td>0.0038</td>
+                  <td>0.19%</td>
+                  <td>7.64%</td>
+                  <td><span class="fp-badge danger">1,177</span></td>
+                  <td><span class="tag-badge failed">None (Temporal Smearing)</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Why TGAT Card -->
+        <div class="card glass-panel flex-1">
+          <div class="card-header">
+            <h2 class="card-title">Why TGAT is Selected</h2>
+            <span class="badge-tag green">Strategic Alignment</span>
+          </div>
+          <div class="decision-points">
+            <div class="decision-item">
+              <div class="decision-icon success">✓</div>
+              <div class="decision-content">
+                <h4>Resolves Static Graph Failure</h4>
+                <p>Static GCN failed (0.6064 ROC-AUC) because collapsing time aggregates transactions across months into spurious static edges, propagating future information backwards.</p>
+              </div>
+            </div>
+            <div class="decision-item">
+              <div class="decision-icon success">✓</div>
+              <div class="decision-content">
+                <h4>Dynamic Attention Explainability</h4>
+                <p>Unlike black-box XGBoost which only outputs global feature bars, TGAT computes multi-head attention weights $\alpha_{ij}$ on past transfers, tracing exact money laundering chains.</p>
+              </div>
+            </div>
+            <div class="decision-item">
+              <div class="decision-icon success">✓</div>
+              <div class="decision-content">
+                <h4>Continuous Time Encoding</h4>
+                <p>Uses harmonic Fourier basis functions (Bochner's Theorem) mapping continuous time differences $\Delta t$, distinguishing rapid bursts from normal cadence.</p>
+              </div>
+            </div>
+            <div class="decision-item">
+              <div class="decision-icon success">✓</div>
+              <div class="decision-content">
+                <h4>83.8% Alert Noise Reduction</h4>
+                <p>The frozen operating threshold ($\tau^* = 0.7372$) slashes false positives from 2,198 down to 357, saving hundreds of compliance investigator hours daily.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dataset Split Architecture -->
+      <div class="card glass-panel">
+        <div class="card-header">
+          <h2 class="card-title">Chronological Temporal Pipeline Architecture</h2>
+          <span class="badge-tag">Zero Temporal Leakage</span>
+        </div>
+        <div class="timeline-container">
+          <div class="timeline-step">
+            <div class="step-badge">TRAIN SPLIT</div>
+            <div class="step-rows">5,749,364 rows</div>
+            <div class="step-meta">2,763 Positives (0.048%)</div>
+            <div class="step-desc">Features Scaler Fit Solely Here. Chronological Streaming.</div>
+          </div>
+          <div class="timeline-arrow">→</div>
+          <div class="timeline-step">
+            <div class="step-badge val">VALIDATION SPLIT</div>
+            <div class="step-rows">891,571 rows</div>
+            <div class="step-meta">367 Positives (0.041%)</div>
+            <div class="step-desc">Threshold Selected (max_f1 = 0.7372). Test Strictly Quarantined.</div>
+          </div>
+          <div class="timeline-arrow">→</div>
+          <div class="timeline-step">
+            <div class="step-badge test">TEST SPLIT</div>
+            <div class="step-rows">282,877 rows</div>
+            <div class="step-meta">301 Positives (0.106%)</div>
+            <div class="step-desc">Evaluated Once at Frozen Threshold. 0.9022 ROC-AUC.</div>
+          </div>
+          <div class="timeline-arrow">→</div>
+          <div class="timeline-step">
+            <div class="step-badge future">FUTURE SPLIT</div>
+            <div class="step-rows">223 rows</div>
+            <div class="step-meta">134 Positives (60.09%)</div>
+            <div class="step-desc">Out-of-Distribution Generalization Window.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: FRAUD RING GRAPH VISUALIZER -->
+    <section class="tab-view" id="view-graph">
+      <div class="graph-layout">
+        <div class="graph-main card glass-panel">
+          <div class="graph-toolbar">
+            <div class="toolbar-group">
+              <label for="ring-select" class="toolbar-label">Select Fraud Ring Case:</label>
+              <select id="ring-select" class="styled-select">
+                <option value="case_2_smurfing_ring">Case #2: Multi-Mule Fan-Out Smurfing Ring (20 accounts)</option>
+                <option value="case_1_structuring">Case #1: High-Conviction Structuring Transfer (0.847 score)</option>
+                <option value="case_3_layering">Case #3: High-Value Interbank Layering ($31,778)</option>
+                <option value="case_4_legitimate">Case #4: Clean Merchant Commerce (Normal Control)</option>
+              </select>
+            </div>
+
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary" id="btn-toggle-animation">
+                <span class="btn-icon">▶</span> Animate Flow
+              </button>
+              <button class="btn btn-secondary" id="btn-reset-view">
+                Reset View
+              </button>
+              <button class="btn btn-primary" id="btn-simulate-ring">
+                Simulate in TGAT
+              </button>
+            </div>
+          </div>
+
+          <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="graph-canvas"></canvas>
+            <!-- Canvas Overlay Legend -->
+            <div class="graph-legend">
+              <div class="legend-item"><span class="node-indicator hub"></span> Hub / Origin</div>
+              <div class="legend-item"><span class="node-indicator mule"></span> Money Mule</div>
+              <div class="legend-item"><span class="node-indicator shell"></span> Shell Account</div>
+              <div class="legend-item"><span class="node-indicator receiver"></span> Target Account</div>
+              <div class="legend-item"><span class="edge-indicator high"></span> High TGAT Attention (>0.4)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Graph Inspector Sidebar -->
+        <div class="graph-sidebar card glass-panel" id="graph-inspector">
+          <div class="card-header">
+            <h3 class="card-title">Investigation Inspector</h3>
+            <span class="badge-tag" id="inspector-badge">Selected Entity</span>
+          </div>
+
+          <div class="inspector-body" id="inspector-content">
+            <div class="empty-state">
+              <p>Click any account node or transaction edge on the canvas to inspect real-time feature attributes and attention breakdown.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: CASE STUDIES -->
+    <section class="tab-view" id="view-cases">
+      <div class="section-header">
+        <div>
+          <h2 class="view-title">Forensic Case Studies from Test Benchmark</h2>
+          <p class="view-subtitle">Ground-truth verified money laundering typologies investigated using TGAT attention weights.</p>
+        </div>
+      </div>
+
+      <div class="cases-grid" id="cases-cards-container">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+    </section>
+
+    <!-- VIEW 4: LIVE TGAT INFERENCE SIMULATOR -->
+    <section class="tab-view" id="view-simulator">
+      <div class="simulator-layout">
+        <!-- Input Form -->
+        <div class="simulator-form card glass-panel">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Transaction Scoring Engine</h2>
+              <p class="card-subtitle">Execute live forward pass through PyTorch TGAT with frozen threshold decision</p>
+            </div>
+            <div class="preset-selector">
+              <label for="preset-select">Load Preset:</label>
+              <select id="preset-select" class="styled-select-sm">
+                <option value="custom">-- Custom Input --</option>
+                <option value="case1">Case 1: Rapid Structuring Alert</option>
+                <option value="case2">Case 2: Smurfing Fan-Out</option>
+                <option value="case3">Case 3: Interbank Layering</option>
+                <option value="clean">Case 4: Normal Payroll Transfer</option>
+              </select>
+            </div>
+          </div>
+
+          <form id="tx-sim-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="input-sender">From Account (Sender)</label>
+                <input type="text" id="input-sender" class="styled-input mono" value="81156E7A0" required>
+              </div>
+              <div class="form-group">
+                <label for="input-receiver">To Account (Receiver)</label>
+                <input type="text" id="input-receiver" class="styled-input mono" value="81156E840" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="input-amount">Amount Received ($)</label>
+                <input type="number" id="input-amount" class="styled-input" value="189.19" step="0.01" required>
+              </div>
+              <div class="form-group">
+                <label for="input-amount-paid">Amount Paid ($)</label>
+                <input type="number" id="input-amount-paid" class="styled-input" value="189.19" step="0.01" required>
+              </div>
+            </div>
+
+            <div class="form-row switches">
+              <label class="switch-container">
+                <input type="checkbox" id="check-cross-bank" checked>
+                <span class="switch-slider"></span>
+                <span class="switch-label">Cross-Bank Transfer</span>
+              </label>
+
+              <label class="switch-container">
+                <input type="checkbox" id="check-same-currency" checked>
+                <span class="switch-slider"></span>
+                <span class="switch-label">Same Currency</span>
+              </label>
+
+              <label class="switch-container">
+                <input type="checkbox" id="check-weekend">
+                <span class="switch-slider"></span>
+                <span class="switch-label">Weekend Transaction</span>
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-lg" id="btn-run-inference">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Execute TGAT Inference
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Output Score Panel -->
+        <div class="simulator-results card glass-panel" id="simulator-output">
+          <div class="card-header">
+            <h3 class="card-title">Live Model Verdict & Explainability</h3>
+            <span class="badge-tag" id="sim-verdict-tag">Awaiting Input</span>
+          </div>
+
+          <div class="sim-verdict-box" id="verdict-banner">
+            <div class="gauge-wrapper">
+              <div class="score-circle" id="score-dial">
+                <span class="score-percent" id="sim-score-val">0.0%</span>
+                <span class="score-label">Fraud Probability</span>
+              </div>
+            </div>
+            <div class="verdict-text-box">
+              <div class="verdict-headline" id="sim-verdict-text">Ready for scoring</div>
+              <p class="verdict-desc" id="sim-verdict-desc">Configure parameters and click Execute to test live PyTorch scoring against the 0.7372 frozen threshold.</p>
+            </div>
+          </div>
+
+          <!-- Attention Weight Decomposition Chart -->
+          <div class="attention-section">
+            <h4 class="sub-heading">TGAT Layer 2 Temporal Attention Weights (Top Neighbors)</h4>
+            <div class="attention-bars" id="attention-bars-container">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: ABLATIONS & DIAGNOSTICS -->
+    <section class="tab-view" id="view-diagnostics">
+      <div class="card glass-panel">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Systematic Ablation Study (15 Experiments)</h2>
+            <p class="card-subtitle">Empirical evidence isolating each component's contribution on the IBM AML benchmark</p>
+          </div>
+          <span class="badge-tag">AdamW • lr=0.001 • Seed 42</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="benchmark-table" id="ablation-table">
+            <thead>
+              <tr>
+                <th>Experiment ID</th>
+                <th>Intervention / Description</th>
+                <th>Val ROC-AUC</th>
+                <th>Test ROC-AUC</th>
+                <th>Test PR-AUC</th>
+                <th>Test F1</th>
+                <th>Precision@100</th>
+                <th>Training Time</th>
+              </tr>
+            </thead>
+            <tbody id="ablation-table-body">
+              <!-- Populated dynamically from /api/ablations -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Diagnostic Charts Grid -->
+      <div class="charts-grid">
+        <div class="card glass-panel chart-card">
+          <h3 class="card-title">Validation Precision-Recall Curve</h3>
+          <img src="/plots/pr_curve.png" alt="Validation PR Curve" class="diagnostic-img" onerror="this.style.display='none'">
+        </div>
+        <div class="card glass-panel chart-card">
+          <h3 class="card-title">Operating Threshold vs Metrics</h3>
+          <img src="/plots/threshold_vs_metrics.png" alt="Threshold Tradeoff" class="diagnostic-img" onerror="this.style.display='none'">
+        </div>
+        <div class="card glass-panel chart-card">
+          <h3 class="card-title">Score Distribution (Legitimate vs Laundering)</h3>
+          <img src="/plots/score_distribution.png" alt="Score Distribution" class="diagnostic-img" onerror="this.style.display='none'">
+        </div>
+        <div class="card glass-panel chart-card">
+          <h3 class="card-title">Top-K Queue Precision@K</h3>
+          <img src="/plots/precision_at_k.png" alt="Precision at K" class="diagnostic-img" onerror="this.style.display='none'">
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

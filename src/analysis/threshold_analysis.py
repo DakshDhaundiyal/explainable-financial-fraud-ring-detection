@@ -10,6 +10,8 @@ import json
 from datetime import date
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -25,15 +27,29 @@ def threshold_grid(scores: np.ndarray, points: int = 1000) -> np.ndarray:
 
 
 def sweep(labels: np.ndarray, scores: np.ndarray, thresholds: np.ndarray) -> pd.DataFrame:
+    labels = np.asarray(labels, dtype=np.int8)
+    scores = np.asarray(scores, dtype=float)
+    total_pos = int(labels.sum())
+    total_neg = len(labels) - total_pos
+
     rows = []
     for threshold in thresholds:
-        m = classification_metrics(labels, scores, threshold=float(threshold), k_values=())
+        t = float(threshold)
+        pred = scores >= t
+        tp = int(np.count_nonzero(pred & (labels == 1)))
+        fp = int(np.count_nonzero(pred & (labels == 0)))
+        fn = total_pos - tp
+        tn = total_neg - fp
+        prec = float(tp / (tp + fp)) if (tp + fp) else 0.0
+        rec = float(tp / total_pos) if total_pos else 0.0
+        f1 = float(2 * prec * rec / (prec + rec)) if (prec + rec) else 0.0
+        fpr = float(fp / (fp + tn)) if (fp + tn) else 0.0
         rows.append({
-            "threshold": float(threshold),
-            "precision": m["precision"], "recall": m["recall"], "f1": m["f1"],
-            "false_positive_rate": m["false_positive_rate"],
-            "tp": m["true_positives"], "fp": m["false_positives"],
-            "tn": m["true_negatives"], "fn": m["false_negatives"],
+            "threshold": t,
+            "precision": prec, "recall": rec, "f1": f1,
+            "false_positive_rate": fpr,
+            "tp": tp, "fp": fp,
+            "tn": tn, "fn": fn,
         })
     return pd.DataFrame(rows)
 
