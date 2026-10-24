@@ -177,7 +177,21 @@ body {
   font-weight: 500;
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s ease-in-out;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-item-btn::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 60%;
+  background-color: #60A5FA;
+  border-radius: 0 3px 3px 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .nav-item-btn svg {
@@ -185,18 +199,29 @@ body {
   height: 18px;
   stroke-width: 2;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
 }
 
 .nav-item-btn:hover {
   background-color: var(--sidebar-hover);
   color: #FFFFFF;
+  transform: translateX(3px);
+}
+
+.nav-item-btn:hover svg {
+  transform: scale(1.08);
 }
 
 .nav-item-btn.active {
   background-color: var(--sidebar-active);
   color: var(--sidebar-active-text);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.45);
+  transform: none;
+}
+
+.nav-item-btn.active::before {
+  transform: translateY(-50%) scaleY(1);
 }
 
 .sidebar-footer {
@@ -222,11 +247,23 @@ body {
   font-weight: 600;
 }
 
+@keyframes pulseDot {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6);
+  }
+  50% {
+    transform: scale(1.18);
+    box-shadow: 0 0 0 5px rgba(52, 211, 153, 0);
+  }
+}
+
 .status-dot {
   width: 7px;
   height: 7px;
   background-color: #34D399;
   border-radius: var(--radius-pill);
+  animation: pulseDot 2.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
 }
 
 .checkpoint-text {
@@ -250,7 +287,9 @@ body {
 /* Top App Header */
 .app-top-header {
   height: 56px;
-  background-color: #FFFFFF;
+  background-color: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-card);
   display: flex;
   align-items: center;
@@ -259,6 +298,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 90;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .top-header-left {
@@ -284,6 +324,7 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   border: 1px solid var(--border-card);
+  transition: background-color 0.2s ease;
 }
 
 .top-header-right {
@@ -303,6 +344,7 @@ body {
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(217, 119, 6, 0.1);
 }
 
 .threshold-val {
@@ -318,12 +360,24 @@ body {
   margin: 0 auto;
 }
 
+@keyframes viewFadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .tab-view {
   display: none;
 }
 
 .tab-view.active {
   display: block;
+  animation: viewFadeSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Page Header */
@@ -362,6 +416,11 @@ body {
   box-shadow: var(--shadow-card);
   margin-bottom: var(--space-6);
   overflow: hidden;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.07);
 }
 
 .card-header {
@@ -406,6 +465,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -5px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.03);
+  border-color: #CBD5E1;
 }
 
 .kpi-header {
@@ -427,6 +493,11 @@ body {
   padding: 2px 7px;
   border-radius: var(--radius-pill);
   font-weight: 600;
+  transition: transform 0.2s ease;
+}
+
+.kpi-card:hover .kpi-badge {
+  transform: scale(1.05);
 }
 
 .kpi-badge.danger {
@@ -469,9 +540,18 @@ body {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease-in-out;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid transparent;
   text-decoration: none;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px -2px rgba(15, 23, 42, 0.12);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn-primary {
@@ -1044,6 +1124,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.risk-factor-card:hover {
+  transform: translateX(3px);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.06);
+  border-color: #CBD5E1;
 }
 
 .risk-factor-header {
@@ -1082,6 +1169,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+
+.summary-pill-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.08);
+  border-color: #CBD5E1;
 }
 
 .summary-pill-label {
@@ -1169,5 +1263,85 @@ body {
   }
   .investigation-sidepanel {
     width: 100%;
+  }
+}
+
+/* ==========================================================================
+   Modern Micro-Animations & Polish
+   ========================================================================== */
+
+/* Subtab Slide & Fade In */
+@keyframes subtabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#tab-content-factors,
+#tab-content-related,
+#tab-content-behavior,
+#tab-content-model,
+#panel-entity-content {
+  animation: subtabFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Subtle High-Risk Badge Pulsing Halo */
+@keyframes badgePulseDanger {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
+  }
+}
+
+.risk-badge.high, .risk-badge.flagged {
+  animation: badgePulseDanger 3s ease-in-out infinite;
+}
+
+/* Table Row Smooth Transition */
+.data-table tbody tr {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.data-table tbody tr:hover {
+  background-color: #F8FAFC;
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Reduced Motion Override (A11y Compliance) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .nav-item-btn:hover,
+  .risk-factor-card:hover,
+  .kpi-card:hover,
+  .summary-pill-card:hover,
+  .btn:hover:not(:disabled) {
+    transform: none !important;
   }
 }
