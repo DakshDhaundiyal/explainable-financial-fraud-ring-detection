@@ -1028,13 +1028,13 @@ function drawGraph() {
     ctx.lineTo(t.x, t.y);
 
     if (isFlagged) {
-      ctx.strokeStyle = isEdgeSelected ? "rgba(220, 38, 38, 0.95)" : "rgba(220, 38, 38, 0.65)";
+      ctx.strokeStyle = isEdgeSelected ? "rgba(244, 63, 94, 0.95)" : "rgba(244, 63, 94, 0.65)";
       ctx.lineWidth = isEdgeSelected ? 3.5 : 2.5;
     } else if (isMedium) {
       ctx.strokeStyle = isEdgeSelected ? "rgba(245, 158, 11, 0.9)" : "rgba(245, 158, 11, 0.5)";
       ctx.lineWidth = isEdgeSelected ? 2.5 : 1.8;
     } else {
-      ctx.strokeStyle = isEdgeSelected ? "rgba(37, 99, 235, 0.8)" : "rgba(148, 163, 184, 0.35)";
+      ctx.strokeStyle = isEdgeSelected ? "rgba(59, 130, 246, 0.9)" : "rgba(100, 116, 139, 0.4)";
       ctx.lineWidth = isEdgeSelected ? 2.0 : 1.2;
     }
     ctx.stroke();
@@ -1073,9 +1073,9 @@ function drawGraph() {
 
       ctx.beginPath();
       ctx.arc(px, py, isFlagged ? 4.0 : 3.0, 0, Math.PI * 2);
-      ctx.fillStyle = isFlagged ? "#EF4444" : "#38BDF8";
-      ctx.shadowColor = isFlagged ? "#DC2626" : "#0284C7";
-      ctx.shadowBlur = 6;
+      ctx.fillStyle = isFlagged ? "#F43F5E" : "#38BDF8";
+      ctx.shadowColor = isFlagged ? "#E11D48" : "#0284C7";
+      ctx.shadowBlur = 8;
       ctx.fill();
       ctx.shadowBlur = 0;
     });
@@ -1094,30 +1094,30 @@ function drawGraph() {
       const pulse = Math.sin(now / 220) * 4;
       ctx.beginPath();
       ctx.arc(n.x, n.y, radius + 5 + pulse, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(220, 38, 38, 0.22)";
+      ctx.fillStyle = "rgba(244, 63, 94, 0.28)";
       ctx.fill();
     } else if (isMedium) {
       const pulse = Math.sin(now / 300) * 2.5;
       ctx.beginPath();
       ctx.arc(n.x, n.y, radius + 3 + pulse, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(245, 158, 11, 0.18)";
+      ctx.fillStyle = "rgba(245, 158, 11, 0.22)";
       ctx.fill();
     }
 
     // Node Core Circle
     ctx.beginPath();
     ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = isFlagged ? "#DC2626" : (isMedium ? "#F59E0B" : "#2563EB");
+    ctx.fillStyle = isFlagged ? "#F43F5E" : (isMedium ? "#F59E0B" : "#3B82F6");
     ctx.fill();
 
     // Node Stroke / Selection
-    ctx.strokeStyle = isSelected ? "#0F172A" : (isHovered ? "#38BDF8" : "#FFFFFF");
+    ctx.strokeStyle = isSelected ? "#38BDF8" : (isHovered ? "#93C5FD" : "rgba(255, 255, 255, 0.4)");
     ctx.lineWidth = isSelected ? 3.5 : (isHovered ? 2.5 : 2);
     ctx.stroke();
 
     // Node Label
     ctx.font = isSelected ? "bold 11px Inter, sans-serif" : "10px Inter, sans-serif";
-    ctx.fillStyle = "#0F172A";
+    ctx.fillStyle = "#F1F5F9";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillText(n.id, n.x, n.y + radius + 5);

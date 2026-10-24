@@ -369,10 +369,10 @@
             </div>
             <div class="card-body">
               <div style="padding: var(--space-5); background: var(--color-success-bg); border: 1px solid var(--color-success-border); border-radius: var(--radius-md); margin-bottom: var(--space-5); display: flex; align-items: center; gap: var(--space-4);">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 <div>
-                  <h4 style="color: #065F46; font-size: 16px; font-weight: 700;">Batch Scoring Completed</h4>
-                  <p style="color: #047857; font-size: 13px;" id="step4-summary-text">All transactions were evaluated causally against the frozen TGAT model.</p>
+                  <h4 style="color: #34D399; font-size: 16px; font-weight: 700;">Batch Scoring Completed</h4>
+                  <p style="color: #A7F3D0; font-size: 13px;" id="step4-summary-text">All transactions were evaluated causally against the frozen TGAT model.</p>
                 </div>
               </div>
 
@@ -446,7 +446,7 @@
           </div>
 
           <!-- Threshold Banner -->
-          <div style="padding: 10px 16px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius-sm); margin-bottom: var(--space-4); display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+          <div style="padding: 10px 16px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #FDE68A; border-radius: var(--radius-sm); margin-bottom: var(--space-4); display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
             <div>
               <strong>Operating Decision Threshold: <span class="mono">0.7372</span></strong> (Validation-Tuned Max F1). High-risk transactions scoring &ge; 0.7372 are flagged.
             </div>
@@ -628,7 +628,7 @@
               </div>
 
               <!-- Risk Score Summary Box -->
-              <div id="exp-score-box" style="background: #F8FAFC; border: 1px solid var(--border-card); border-radius: var(--radius-md); padding: 12px 18px; min-width: 200px; display: flex; flex-direction: column; gap: 4px;">
+              <div id="exp-score-box" style="background: var(--bg-card-subtle); border: 1px solid var(--border-card); border-radius: var(--radius-md); padding: 12px 18px; min-width: 200px; display: flex; flex-direction: column; gap: 4px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 11px; font-weight: 600; color: var(--text-muted);">RISK SCORE</span>
                   <span class="risk-badge low" id="exp-tx-badge">Low Risk</span>
@@ -654,7 +654,7 @@
 
           <!-- Sub-Navigation Tabs (FraudLens Card 5) -->
           <div class="card">
-            <div class="subnav-tabs" style="margin-bottom: 0; background: #FFFFFF; border-bottom: 1px solid var(--border-subtle); padding: 6px 12px 0;">
+            <div class="subnav-tabs" style="margin-bottom: 0; background: var(--bg-card); border-bottom: 1px solid var(--border-subtle); padding: 6px 12px 0;">
               <button class="subnav-btn active" id="btn-exptab-factors" onclick="switchExpTab('factors')">Key Risk Factors</button>
               <button class="subnav-btn" id="btn-exptab-related" onclick="switchExpTab('related')">Related Transactions</button>
               <button class="subnav-btn" id="btn-exptab-behavior" onclick="switchExpTab('behavior')">Account Behaviour</button>
