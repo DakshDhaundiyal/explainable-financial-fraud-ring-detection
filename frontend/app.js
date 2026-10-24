@@ -1,257 +1,1185 @@
 /**
- * Explainable TGAT Financial Fraud Ring Defender
- * Client-Side Controller & Interactive Graph Engine
+ * Explainable TGAT Financial Fraud Ring Investigator
+ * Frontend Single-Page Application Controller
+ * Pure Vanilla ES6 / Zero External Build Tools
  */
 
 // Application State
 const state = {
-  cases: [],
-  currentCase: null,
-  graph: {
-    nodes: [],
-    edges: [],
-    selectedNode: null,
-    selectedEdge: null,
-    isAnimating: true,
-    particles: [],
-    transform: { x: 0, y: 0, scale: 1 },
-    dragNode: null,
-    isPanning: false,
-    panStart: { x: 0, y: 0 },
-  },
-  threshold: 0.737155,
+  currentSessionId: null,
+  activeTab: "view-overview",
+  uploadedCsvContent: null,
+  uploadedFilename: null,
+  resultsPage: 1,
+  resultsLimit: 25,
+  resultsSort: "risk_score:desc",
+  resultsSearch: "",
+  resultsFlagFilter: "",
+  selectedTransactionId: null,
+  graphNodes: [],
+  graphEdges: [],
+  selectedNode: null,
 };
 
-// Initialize Application
+// ============================================================================
+// INITIALIZATION & TAB ROUTING
+// ============================================================================
+
 document.addEventListener("DOMContentLoaded", () => {
-  initTabs();
+  initNavigation();
+  initOverview();
+  initAnalysisStepper();
+  initResultsTable();
   initGraphCanvas();
-  loadCases();
-  loadAblations();
-  initSimulator();
+  initPerformanceView();
+
+  // Load initial health & check for existing session
+  checkInitialSession();
 });
 
-/* ==========================================================================
-   Tab Navigation Routing
-   ========================================================================== */
-function initTabs() {
-  const tabs = document.querySelectorAll(".nav-btn");
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      tabs.forEach((t) => {
-        t.classList.remove("active");
-        t.setAttribute("aria-selected", "false");
-      });
-      document.querySelectorAll(".tab-view").forEach((v) => v.classList.remove("active"));
-
-      tab.classList.add("active");
-      tab.setAttribute("aria-selected", "true");
-
-      const targetId = tab.getAttribute("data-target");
-      const targetView = document.getElementById(targetId);
-      if (targetView) {
-        targetView.classList.add("active");
-        if (targetId === "view-graph") {
-          resizeCanvas();
-        }
-      }
+function initNavigation() {
+  const navButtons = document.querySelectorAll(".nav-item-btn");
+  navButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetView = btn.getAttribute("data-target");
+      switchTab(targetView);
     });
   });
-}
 
-/* ==========================================================================
-   Cases & Data Fetching
-   ========================================================================== */
-async function loadCases() {
-  try {
-    const res = await fetch("/api/cases");
-    if (!res.ok) throw new Error("Failed to load cases");
-    const data = await res.json();
-    state.cases = data.cases || [];
+  const quickNewAnalysisBtn = document.getElementById("btn-quick-new-analysis");
+  if (quickNewAnalysisBtn) {
+    quickNewAnalysisBtn.addEventListener("click", () => {
+      switchTab("view-analysis");
+      resetStepperToStep1();
+    });
+  }
 
-    renderCaseCards();
-    if (state.cases.length > 0) {
-      loadGraphForCase(state.cases[0].id);
-    }
-  } catch (err) {
-    console.warn("Using fallback case studies:", err);
-    loadFallbackCases();
+  const emptyStartBtn = document.getElementById("btn-empty-start-analysis");
+  if (emptyStartBtn) {
+    emptyStartBtn.addEventListener("click", () => {
+      switchTab("view-analysis");
+      resetStepperToStep1();
+    });
+  }
+
+  const viewAllResultsBtn = document.getElementById("btn-view-all-results");
+  if (viewAllResultsBtn) {
+    viewAllResultsBtn.addEventListener("click", () => switchTab("view-results"));
+  }
+
+  const backFromExpBtn = document.getElementById("btn-back-to-results-from-exp");
+  if (backFromExpBtn) {
+    backFromExpBtn.addEventListener("click", () => switchTab("view-results"));
   }
 }
 
-function loadFallbackCases() {
-  state.cases = [
-    {
-      id: "case_2_smurfing_ring",
-      title: "Case #2: Multi-Mule Fan-Out Smurfing Ring",
-      category: "Smurfing / Structuring Dispersion",
-      risk_level: "CRITICAL",
-      score: 0.824,
-      threshold: 0.737155,
-      verdict: "FRAUD_ALERT",
-      ground_truth: "Laundering (Pos)",
-      summary: "Central account 10042B660 systematically fan-outs funds to over 20 destination mule accounts in under 4 hours.",
-      transaction: {
-        from_account: "10042B660",
-        to_account: "807095B40",
-        amount: 92542.99,
-        timestamp: "2022-09-10 00:37:00",
-      },
-      graph: {
-        nodes: [
-          { id: "10042B660", label: "Hub: 10042B660", role: "hub", risk: "CRITICAL", score: 0.88 },
-          { id: "807095B40", label: "Mule: 807095B40", role: "mule", risk: "HIGH", score: 0.82 },
-          { id: "806475AE0", label: "Mule: 806475AE0", role: "mule", risk: "HIGH", score: 0.79 },
-          { id: "8145B5BC0", label: "Mule: 8145B5BC0", role: "mule", risk: "HIGH", score: 0.76 },
-          { id: "812856390", label: "Mule: 812856390", role: "mule", risk: "HIGH", score: 0.74 },
-        ],
-        edges: [
-          { from: "10042B660", to: "807095B40", amount: 92542.99, attention: 0.54, highlight: true, label: "$92,542.99" },
-          { from: "10042B660", to: "806475AE0", amount: 15400.0, attention: 0.38, highlight: true, label: "$15,400.00" },
-          { from: "10042B660", to: "8145B5BC0", amount: 6856.99, attention: 0.29, highlight: false, label: "$6,856.99" },
-          { from: "10042B660", to: "812856390", amount: 4200.0, attention: 0.21, highlight: false, label: "$4,200.00" },
-        ],
-      },
-    },
-    {
-      id: "case_1_structuring",
-      title: "Case #1: High-Conviction Structuring Alert",
-      category: "Structuring / Rapid Succession",
-      risk_level: "CRITICAL",
-      score: 0.847,
-      threshold: 0.737155,
-      verdict: "FRAUD_ALERT",
-      ground_truth: "Laundering (Pos)",
-      summary: "Transfer of $189.19 with abnormal velocity and rapid counterparty turnaround. TGAT predicts 84.7% fraud probability.",
-      transaction: {
-        from_account: "81156E7A0",
-        to_account: "81156E840",
-        amount: 189.19,
-        timestamp: "2022-09-10 16:40:00",
-      },
-      graph: {
-        nodes: [
-          { id: "81156E7A0", label: "Sender: 81156E7A0", role: "sender", risk: "HIGH", score: 0.847 },
-          { id: "81156E840", label: "Receiver: 81156E840", role: "receiver", risk: "HIGH", score: 0.847 },
-          { id: "81156E7A0_n1", label: "Acct: 81156A001", role: "mule", risk: "MEDIUM", score: 0.42 },
-          { id: "81156E840_n1", label: "Acct: 81156C003", role: "shell", risk: "HIGH", score: 0.71 },
-        ],
-        edges: [
-          { from: "81156E7A0", to: "81156E840", amount: 189.19, attention: 0.62, highlight: true, label: "$189.19 (Current)" },
-          { from: "81156E7A0_n1", to: "81156E7A0", amount: 2500.0, attention: 0.28, highlight: false, label: "$2,500.00" },
-          { from: "81156E840", to: "81156E840_n1", amount: 4200.0, attention: 0.15, highlight: false, label: "$4,200.00" },
-        ],
-      },
-    },
-  ];
-  renderCaseCards();
-  loadGraphForCase(state.cases[0].id);
+function switchTab(viewId) {
+  state.activeTab = viewId;
+
+  // Update nav buttons
+  document.querySelectorAll(".nav-item-btn").forEach((btn) => {
+    const isTarget = btn.getAttribute("data-target") === viewId;
+    btn.classList.toggle("active", isTarget);
+    btn.setAttribute("aria-selected", isTarget ? "true" : "false");
+  });
+
+  // Update view visibility
+  document.querySelectorAll(".tab-view").forEach((view) => {
+    view.classList.toggle("active", view.id === viewId);
+  });
+
+  // Contextual refresh on tab entry
+  if (viewId === "view-overview") {
+    loadOverview();
+  } else if (viewId === "view-results") {
+    loadResultsTable(1);
+  } else if (viewId === "view-investigation") {
+    loadGraph();
+  } else if (viewId === "view-performance") {
+    loadPerformance();
+  }
 }
 
-function renderCaseCards() {
-  const container = document.getElementById("cases-cards-container");
+async function checkInitialSession() {
+  try {
+    const res = await fetch("/api/analysis/overview");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.has_data && data.session_id) {
+      state.currentSessionId = data.session_id;
+      updateHeaderSession(data.session_id, data.threshold);
+      loadOverview();
+    }
+  } catch (err) {
+    console.warn("No active initial session:", err);
+  }
+}
+
+function updateHeaderSession(sessionId, threshold) {
+  const pill = document.getElementById("header-session-id");
+  if (pill) pill.textContent = sessionId;
+
+  const threshVal = document.getElementById("header-threshold-val");
+  if (threshVal && threshold) threshVal.textContent = Number(threshold).toFixed(4);
+}
+
+// ============================================================================
+// 1. OVERVIEW VIEW
+// ============================================================================
+
+function initOverview() {
+  const loadSampleBtn = document.getElementById("btn-overview-load-sample");
+  if (loadSampleBtn) {
+    loadSampleBtn.addEventListener("click", async () => {
+      await loadDemoSampleBatch(50);
+    });
+  }
+}
+
+async function loadOverview() {
+  const emptyState = document.getElementById("overview-empty-state");
+  const activeContent = document.getElementById("overview-active-content");
+
+  try {
+    const url = state.currentSessionId
+      ? `/api/analysis/overview?session_id=${encodeURIComponent(state.currentSessionId)}`
+      : `/api/analysis/overview`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Overview API error");
+    const data = await res.json();
+
+    if (!data.has_data) {
+      if (emptyState) emptyState.style.display = "flex";
+      if (activeContent) activeContent.style.display = "none";
+      return;
+    }
+
+    if (emptyState) emptyState.style.display = "none";
+    if (activeContent) activeContent.style.display = "block";
+
+    state.currentSessionId = data.session_id;
+    updateHeaderSession(data.session_id, data.threshold);
+
+    // KPIs
+    document.getElementById("kpi-total-analysed").textContent = data.total_transactions.toLocaleString();
+    document.getElementById("kpi-flagged-count").textContent = data.flagged_transactions.toLocaleString();
+    document.getElementById("kpi-flag-rate").textContent = `${data.flagged_rate}%`;
+    document.getElementById("kpi-flag-rate-denom").textContent = `Denominator: ${data.flagged_transactions} / ${data.total_transactions} txs`;
+    document.getElementById("kpi-distinct-accounts").textContent = data.distinct_accounts.toLocaleString();
+
+    // Execution Record
+    document.getElementById("meta-filename").textContent = data.filename || "upload.csv";
+    document.getElementById("meta-session-id").textContent = data.session_id;
+    document.getElementById("meta-duration").textContent = `${data.duration_seconds}s`;
+
+    // Histogram
+    renderHistogram(data.score_distribution || []);
+
+    // Recent Flagged Table
+    renderRecentFlagged(data.recent_flagged || []);
+  } catch (err) {
+    console.error("Failed to load overview:", err);
+  }
+}
+
+function renderHistogram(bins) {
+  const container = document.getElementById("overview-histogram");
   if (!container) return;
+  container.innerHTML = "";
 
-  container.innerHTML = state.cases
+  const maxCount = Math.max(1, ...bins.map((b) => b.count));
+
+  bins.forEach((b, idx) => {
+    const col = document.createElement("div");
+    col.className = "hist-col";
+
+    const heightPct = Math.max(4, Math.round((b.count / maxCount) * 100));
+    const isAboveThreshold = idx >= 7; // >= 0.70
+
+    col.innerHTML = `
+      <div style="font-size: 10px; font-weight: 600; color: var(--text-muted); margin-bottom: 2px;">${b.count}</div>
+      <div class="hist-bar ${isAboveThreshold ? "flagged-bar" : ""}" style="height: ${heightPct}%;" title="${b.range}: ${b.count} txs (${b.percentage}%)"></div>
+      <div class="hist-label">${b.range.split("–")[0]}</div>
+    `;
+    container.appendChild(col);
+  });
+}
+
+function renderRecentFlagged(flaggedTxs) {
+  const tbody = document.getElementById("overview-flagged-tbody");
+  if (!tbody) return;
+
+  if (flaggedTxs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No transactions exceeded the 0.7372 threshold in this batch.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = flaggedTxs
     .map(
-      (c) => `
-    <div class="case-card glass-panel" id="card-${c.id}">
-      <div>
-        <div class="case-header">
-          <span class="case-category">${c.category}</span>
-          <span class="badge-tag ${c.risk_level === "CRITICAL" ? "green" : "neutral"}">${c.risk_level}</span>
+      (tx) => `
+    <tr>
+      <td class="mono"><strong>${tx.id}</strong></td>
+      <td class="mono">${formatTimestamp(tx.timestamp)}</td>
+      <td class="mono">${tx.from_account}</td>
+      <td class="mono">${tx.to_account}</td>
+      <td class="mono" style="font-weight: 600;">$${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td>
+        <div class="score-bar-wrapper">
+          <div class="score-bar"><div class="score-fill flagged" style="width: ${Math.round(tx.risk_score * 100)}%;"></div></div>
+          <span class="score-num text-danger">${Number(tx.risk_score).toFixed(4)}</span>
         </div>
-        <h3 class="case-title">${c.title}</h3>
-        <p class="case-summary">${c.summary}</p>
-      </div>
-
-      <div>
-        <div class="case-metrics-row">
-          <div class="case-metric">
-            <span class="m-label">TGAT Score</span>
-            <div class="m-val ${c.score >= c.threshold ? "text-cyan" : "text-emerald"}">${(c.score * 100).toFixed(1)}%</div>
-          </div>
-          <div class="case-metric">
-            <span class="m-label">Transfer Amount</span>
-            <div class="m-val">$${Number(c.transaction.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-          </div>
-          <div class="case-metric">
-            <span class="m-label">Ground Truth</span>
-            <div class="m-val">${c.ground_truth}</div>
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-primary" onclick="switchToGraph('${c.id}')" style="flex: 1;">
-            Inspect Fraud Ring Graph
-          </button>
-          <button class="btn btn-secondary" onclick="loadCaseIntoSimulator('${c.id}')">
-            Simulate
-          </button>
-        </div>
-      </div>
-    </div>
+      </td>
+      <td><span class="risk-badge flagged">FLAGGED</span></td>
+      <td><button class="btn btn-secondary btn-sm" onclick="inspectTransaction('${tx.id}')">Investigate</button></td>
+    </tr>
   `
     )
     .join("");
 }
 
-window.switchToGraph = function (caseId) {
-  const tab = document.getElementById("tab-graph-btn");
-  if (tab) tab.click();
-  const select = document.getElementById("ring-select");
-  if (select) {
-    select.value = caseId;
+// ============================================================================
+// 2. NEW ANALYSIS STEPPER
+// ============================================================================
+
+function initAnalysisStepper() {
+  const dropzone = document.getElementById("csv-dropzone");
+  const fileInput = document.getElementById("csv-file-input");
+  const browseBtn = document.getElementById("btn-browse-file");
+  const demoBatchBtn = document.getElementById("btn-load-demo-batch");
+  const proceedValidateBtn = document.getElementById("btn-proceed-to-validate");
+  const backUploadBtn = document.getElementById("btn-back-to-upload");
+  const proceedAnalyseBtn = document.getElementById("btn-proceed-to-analyse");
+  const startScoringBtn = document.getElementById("btn-start-model-scoring");
+  const step4ResultsBtn = document.getElementById("btn-step4-view-results");
+  const step4GraphBtn = document.getElementById("btn-step4-view-graph");
+
+  if (dropzone && fileInput) {
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("drag-over");
+    });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag-over"));
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("drag-over");
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFileSelected(e.dataTransfer.files[0]);
+      }
+    });
   }
-  loadGraphForCase(caseId);
-};
 
-window.loadCaseIntoSimulator = function (caseId) {
-  const c = state.cases.find((item) => item.id === caseId);
-  if (!c) return;
+  if (browseBtn && fileInput) {
+    browseBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files && fileInput.files[0]) {
+        handleFileSelected(fileInput.files[0]);
+      }
+    });
+  }
 
-  const tab = document.getElementById("tab-simulator-btn");
-  if (tab) tab.click();
+  if (demoBatchBtn) {
+    demoBatchBtn.addEventListener("click", async () => {
+      await loadDemoSampleBatch(50);
+    });
+  }
 
-  document.getElementById("input-sender").value = c.transaction.from_account;
-  document.getElementById("input-receiver").value = c.transaction.to_account;
-  document.getElementById("input-amount").value = c.transaction.amount;
-  document.getElementById("input-amount-paid").value = c.transaction.amount;
+  if (proceedValidateBtn) {
+    proceedValidateBtn.addEventListener("click", () => runValidationStep());
+  }
 
-  showToast(`Loaded ${c.title} into simulator.`);
-};
+  if (backUploadBtn) {
+    backUploadBtn.addEventListener("click", () => setStepperStep(1));
+  }
 
-/* ==========================================================================
-   Ablation Studies Data
-   ========================================================================== */
-async function loadAblations() {
-  const tbody = document.getElementById("ablation-table-body");
-  if (!tbody) return;
+  if (proceedAnalyseBtn) {
+    proceedAnalyseBtn.addEventListener("click", () => setStepperStep(3));
+  }
+
+  if (startScoringBtn) {
+    startScoringBtn.addEventListener("click", () => executeBatchScoring());
+  }
+
+  if (step4ResultsBtn) {
+    step4ResultsBtn.addEventListener("click", () => switchTab("view-results"));
+  }
+
+  if (step4GraphBtn) {
+    step4GraphBtn.addEventListener("click", () => switchTab("view-investigation"));
+  }
+}
+
+function handleFileSelected(file) {
+  if (!file.name.endsWith(".csv")) {
+    alert("Please select a valid .csv file.");
+    return;
+  }
+
+  state.uploadedFilename = file.name;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    state.uploadedCsvContent = e.target.result;
+    document.getElementById("file-name-display").textContent = file.name;
+    document.getElementById("file-size-display").textContent = `${(file.size / 1024).toFixed(1)} KB`;
+    document.getElementById("selected-file-summary").style.display = "flex";
+  };
+  reader.readAsText(file);
+}
+
+async function loadDemoSampleBatch(count = 50) {
+  try {
+    const res = await fetch(`/api/analysis/sample?count=${count}`);
+    if (!res.ok) throw new Error("Sample generation failed");
+    const data = await res.json();
+
+    state.uploadedFilename = data.filename;
+    state.uploadedCsvContent = data.csv_content;
+
+    document.getElementById("file-name-display").textContent = data.filename;
+    document.getElementById("file-size-display").textContent = `${(data.csv_content.length / 1024).toFixed(1)} KB (${data.row_count} rows)`;
+    document.getElementById("selected-file-summary").style.display = "flex";
+
+    switchTab("view-analysis");
+    await runValidationStep();
+  } catch (err) {
+    alert(`Could not load benchmark sample: ${err.message}`);
+  }
+}
+
+function resetStepperToStep1() {
+  setStepperStep(1);
+  state.uploadedCsvContent = null;
+  state.uploadedFilename = null;
+  const summary = document.getElementById("selected-file-summary");
+  if (summary) summary.style.display = "none";
+}
+
+function setStepperStep(stepNumber) {
+  for (let i = 1; i <= 4; i++) {
+    const nav = document.getElementById(`step-nav-${i}`);
+    const container = document.getElementById(`step-container-${i}`);
+    if (nav) {
+      nav.classList.toggle("active", i === stepNumber);
+      nav.classList.toggle("completed", i < stepNumber);
+    }
+    if (container) {
+      container.style.display = i === stepNumber ? "block" : "none";
+    }
+  }
+}
+
+async function runValidationStep() {
+  if (!state.uploadedCsvContent) {
+    alert("Please upload a CSV file or load a sample first.");
+    return;
+  }
+
+  setStepperStep(2);
+  const output = document.getElementById("validation-diagnostic-output");
+  const proceedBtn = document.getElementById("btn-proceed-to-analyse");
+  output.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--text-muted);">Validating schema and transaction causal structure...</div>`;
+  proceedBtn.disabled = true;
 
   try {
-    const res = await fetch("/api/ablations");
-    if (!res.ok) throw new Error("Ablations API error");
-    const data = await res.json();
-    const runs = data.experiments || [];
+    const res = await fetch("/api/analysis/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: state.uploadedFilename || "upload.csv",
+        csv_content: state.uploadedCsvContent,
+      }),
+    });
+    if (!res.ok) throw new Error("Validation service error");
+    const val = await res.json();
 
-    tbody.innerHTML = runs
-      .map(
-        (r) => `
-      <tr>
-        <td><strong class="mono">${r.name}</strong></td>
-        <td>${getAblationDescription(r.name)}</td>
-        <td><span class="stat-pill">${r.val_roc_auc ? r.val_roc_auc.toFixed(4) : "—"}</span></td>
-        <td><span class="stat-pill ${r.test_roc_auc > 0.89 ? "success" : "danger"}">${r.test_roc_auc ? r.test_roc_auc.toFixed(4) : "—"}</span></td>
-        <td><span class="stat-pill">${r.test_pr_auc ? r.test_pr_auc.toFixed(4) : "—"}</span></td>
-        <td>${r.test_f1 !== undefined ? r.test_f1.toFixed(4) : "—"}</td>
-        <td>${r.test_p100 !== undefined ? (r.test_p100 * 100).toFixed(1) + "%" : "—"}</td>
-        <td class="mono">${r.training_seconds ? Math.round(r.training_seconds) + "s" : "—"}</td>
-      </tr>
-    `
-      )
-      .join("");
+    let html = "";
+    if (val.valid) {
+      proceedBtn.disabled = false;
+      html += `
+        <div style="background: var(--color-success-bg); border: 1px solid var(--color-success-border); padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-3);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div>
+            <strong style="color: #065F46;">Schema Validation Succeeded</strong>
+            <div style="font-size: 12px; color: #047857;">Format: ${val.format_detected.toUpperCase()} &bull; Total valid rows: ${val.valid_rows.toLocaleString()}</div>
+          </div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div style="background: var(--color-flagged-bg); border: 1px solid var(--color-flagged-border); padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: var(--space-4);">
+          <strong style="color: var(--color-flagged);">Validation Errors Detected</strong>
+          <ul style="font-size: 13px; color: var(--color-flagged); margin-top: 6px; padding-left: 18px;">
+            ${val.errors.map((e) => `<li>${e.column ? `<strong>[${e.column}]</strong> ` : ""}${e.message}</li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
+    if (val.warnings && val.warnings.length > 0) {
+      html += `
+        <div style="background: var(--color-warning-bg); border: 1px solid var(--color-warning-border); padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: var(--space-4);">
+          <strong style="color: var(--color-warning); font-size: 12px;">Operational Warnings:</strong>
+          <ul style="font-size: 12px; color: #92400E; margin-top: 4px; padding-left: 18px;">
+            ${val.warnings.map((w) => `<li>${w}</li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
+    // Sample preview
+    if (val.sample_preview && val.sample_preview.length > 0) {
+      const keys = Object.keys(val.sample_preview[0]);
+      html += `
+        <div style="margin-top: var(--space-4);">
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Data Preview (First ${val.sample_preview.length} Rows):</div>
+          <div class="table-responsive" style="max-height: 200px;">
+            <table class="data-table">
+              <thead><tr>${keys.map((k) => `<th>${k}</th>`).join("")}</tr></thead>
+              <tbody>
+                ${val.sample_preview
+                  .map(
+                    (row) => `
+                  <tr>${keys.map((k) => `<td class="mono">${row[k] !== undefined ? row[k] : ""}</td>`).join("")}</tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    output.innerHTML = html;
   } catch (err) {
-    console.warn("Error loading ablations:", err);
+    output.innerHTML = `<div style="color: var(--color-flagged); padding: 16px;">Validation failed: ${err.message}</div>`;
+  }
+}
+
+async function executeBatchScoring() {
+  const readyDiv = document.getElementById("analysis-ready-state");
+  const loadingDiv = document.getElementById("analysis-loading-state");
+
+  readyDiv.style.display = "none";
+  loadingDiv.style.display = "block";
+
+  try {
+    const res = await fetch("/api/analysis/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: state.uploadedFilename || "upload.csv",
+        csv_content: state.uploadedCsvContent,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.detail || "Analysis execution failed.");
+    }
+
+    const data = await res.json();
+    state.currentSessionId = data.session_id;
+    updateHeaderSession(data.session_id, data.threshold);
+
+    // Populate Step 4
+    document.getElementById("step4-kpi-total").textContent = data.total_transactions.toLocaleString();
+    document.getElementById("step4-kpi-flagged").textContent = data.flagged_transactions.toLocaleString();
+    document.getElementById("step4-kpi-rate").textContent = `${data.flagged_rate}%`;
+    document.getElementById("step4-kpi-duration").textContent = `${data.duration_seconds}s`;
+
+    setStepperStep(4);
+  } catch (err) {
+    alert(`Batch analysis error: ${err.message}`);
+    readyDiv.style.display = "block";
+    loadingDiv.style.display = "none";
+  }
+}
+
+// ============================================================================
+// 3. DETECTION RESULTS TABLE
+// ============================================================================
+
+function initResultsTable() {
+  const searchInput = document.getElementById("table-search-input");
+  const flagFilter = document.getElementById("table-flag-filter");
+  const sortFilter = document.getElementById("table-sort-filter");
+  const prevBtn = document.getElementById("btn-prev-page");
+  const nextBtn = document.getElementById("btn-next-page");
+  const exportBtn = document.getElementById("btn-export-results-csv");
+
+  let debounceTimer;
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        state.resultsSearch = searchInput.value.trim();
+        loadResultsTable(1);
+      }, 300);
+    });
+  }
+
+  if (flagFilter) {
+    flagFilter.addEventListener("change", () => {
+      state.resultsFlagFilter = flagFilter.value;
+      loadResultsTable(1);
+    });
+  }
+
+  if (sortFilter) {
+    sortFilter.addEventListener("change", () => {
+      state.resultsSort = sortFilter.value;
+      loadResultsTable(1);
+    });
+  }
+
+  if (prevBtn) {
+    prevBtn.addEventListener("click", () => {
+      if (state.resultsPage > 1) loadResultsTable(state.resultsPage - 1);
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener("click", () => {
+      loadResultsTable(state.resultsPage + 1);
+    });
+  }
+
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      if (!state.currentSessionId) {
+        alert("No active analysis session to export.");
+        return;
+      }
+      window.location.href = `/api/analysis/${encodeURIComponent(state.currentSessionId)}/export`;
+    });
+  }
+}
+
+async function loadResultsTable(page = 1) {
+  state.resultsPage = page;
+  const tbody = document.getElementById("results-table-tbody");
+  if (!tbody) return;
+
+  if (!state.currentSessionId) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 36px;">No analysis loaded. Upload transactions to view results.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading paginated results...</td></tr>`;
+
+  try {
+    const [sortCol, sortDir] = state.resultsSort.split(":");
+    const params = new URLSearchParams({
+      page: page,
+      limit: state.resultsLimit,
+      sort_by: sortCol || "risk_score",
+      sort_dir: sortDir || "desc",
+    });
+
+    if (state.resultsSearch) params.append("search", state.resultsSearch);
+    if (state.resultsFlagFilter) params.append("flag_filter", state.resultsFlagFilter);
+
+    const res = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/results?${params.toString()}`);
+    if (!res.ok) throw new Error("Results query failed");
+    const data = await res.json();
+
+    const items = data.items || [];
+    if (items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 36px;">No matching transactions found for filter criteria.</td></tr>`;
+      document.getElementById("pagination-info").textContent = "Showing 0 of 0 records";
+      document.getElementById("btn-prev-page").disabled = true;
+      document.getElementById("btn-next-page").disabled = true;
+      return;
+    }
+
+    tbody.innerHTML = items
+      .map((tx) => {
+        const isFlagged = tx.classification === "FLAGGED";
+        const scorePct = Math.min(100, Math.round(tx.risk_score * 100));
+
+        let groundTruthBadge = `<span class="mono" style="color: var(--text-muted); font-size: 11px;">Unlabeled</span>`;
+        if (tx.ground_truth === 1) {
+          groundTruthBadge = `<span class="risk-badge flagged" title="IBM AML Dataset Verified Label">LAUNDERING (1)</span>`;
+        } else if (tx.ground_truth === 0) {
+          groundTruthBadge = `<span class="risk-badge normal">CLEAN (0)</span>`;
+        }
+
+        return `
+        <tr>
+          <td class="mono"><strong>${tx.id}</strong></td>
+          <td class="mono" style="font-size: 11px;">${tx.timestamp_str || formatTimestamp(tx.timestamp)}</td>
+          <td class="mono">${tx.from_account}</td>
+          <td class="mono">${tx.to_account}</td>
+          <td class="mono" style="font-weight: 600;">$${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td>
+            <div class="score-bar-wrapper">
+              <div class="score-bar"><div class="score-fill ${isFlagged ? "flagged" : ""}" style="width: ${scorePct}%;"></div></div>
+              <span class="score-num ${isFlagged ? "text-danger" : ""}">${Number(tx.risk_score).toFixed(4)}</span>
+            </div>
+          </td>
+          <td>
+            <span class="risk-badge ${isFlagged ? "flagged" : "normal"}">
+              ${isFlagged ? "FLAGGED" : "BELOW THRESHOLD"}
+            </span>
+          </td>
+          <td>${groundTruthBadge}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" onclick="inspectTransaction('${tx.id}')">Investigate</button>
+          </td>
+        </tr>
+      `;
+      })
+      .join("");
+
+    // Update Pagination Toolbar
+    const startIdx = (data.page - 1) * data.limit + 1;
+    const endIdx = Math.min(data.total, data.page * data.limit);
+    document.getElementById("pagination-info").textContent = `Showing ${startIdx}–${endIdx} of ${data.total} records`;
+    document.getElementById("current-page-display").textContent = `Page ${data.page} of ${data.pages}`;
+    document.getElementById("btn-prev-page").disabled = data.page <= 1;
+    document.getElementById("btn-next-page").disabled = data.page >= data.pages;
+    document.getElementById("results-count-summary").textContent = `Analysis total: ${data.total} records`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--color-flagged); padding: 24px;">Failed to load results: ${err.message}</td></tr>`;
+  }
+}
+
+// Global inspect function wired to Investigate button
+window.inspectTransaction = function (txId) {
+  state.selectedTransactionId = txId;
+  switchTab("view-explanation");
+  loadTransactionExplanation(txId);
+};
+
+// ============================================================================
+// 4. CONNECTED ACCOUNTS GRAPH (CANVAS FORCE-DIRECTED)
+// ============================================================================
+
+let canvas, ctx, simulationTimer;
+
+function initGraphCanvas() {
+  canvas = document.getElementById("graph-canvas");
+  if (!canvas) return;
+  ctx = canvas.getContext("2d");
+
+  const scoreSlider = document.getElementById("graph-score-slider");
+  const scoreVal = document.getElementById("graph-score-val");
+  const resetBtn = document.getElementById("btn-reset-graph");
+
+  if (scoreSlider && scoreVal) {
+    scoreSlider.addEventListener("input", () => {
+      scoreVal.textContent = Number(scoreSlider.value).toFixed(2);
+      loadGraph(parseFloat(scoreSlider.value));
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      if (scoreSlider) scoreSlider.value = "0";
+      if (scoreVal) scoreVal.textContent = "0.00";
+      loadGraph(0);
+    });
+  }
+
+  // Handle canvas clicks
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Find clicked node
+    for (const node of state.graphNodes) {
+      const dist = Math.hypot(node.x - x, node.y - y);
+      if (dist <= 15) {
+        state.selectedNode = node;
+        inspectAccount(node.id);
+        drawGraph();
+        return;
+      }
+    }
+  });
+}
+
+async function loadGraph(minScore = 0) {
+  if (!canvas) return;
+
+  // Responsive sizing
+  const wrapper = canvas.parentElement;
+  canvas.width = wrapper.clientWidth || 800;
+  canvas.height = 540;
+
+  if (!state.currentSessionId) {
+    drawEmptyGraph("No active analysis. Upload transactions to view connected accounts network.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/graph?min_score=${minScore}`);
+    if (!res.ok) throw new Error("Graph query failed");
+    const data = await res.json();
+
+    const rawNodes = data.nodes || [];
+    const rawEdges = data.edges || [];
+
+    if (rawNodes.length === 0) {
+      drawEmptyGraph("No accounts match the selected edge score threshold.");
+      return;
+    }
+
+    // Initialize layout positions
+    const width = canvas.width;
+    const height = canvas.height;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    state.graphNodes = rawNodes.map((n, i) => {
+      const angle = (i / rawNodes.length) * 2 * Math.PI;
+      const radius = 100 + Math.random() * 140;
+      return {
+        ...n,
+        x: cx + Math.cos(angle) * radius,
+        y: cy + Math.sin(angle) * radius,
+        vx: 0,
+        vy: 0,
+      };
+    });
+
+    state.graphEdges = rawEdges;
+
+    // Run short relaxation simulation
+    runForceSimulation();
+  } catch (err) {
+    drawEmptyGraph(`Failed to load graph: ${err.message}`);
+  }
+}
+
+function runForceSimulation() {
+  let iterations = 40;
+  clearInterval(simulationTimer);
+
+  simulationTimer = setInterval(() => {
+    if (iterations-- <= 0) {
+      clearInterval(simulationTimer);
+      drawGraph();
+      return;
+    }
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    // Repulsion
+    for (let i = 0; i < state.graphNodes.length; i++) {
+      for (let j = i + 1; j < state.graphNodes.length; j++) {
+        const n1 = state.graphNodes[i];
+        const n2 = state.graphNodes[j];
+        const dx = n2.x - n1.x;
+        const dy = n2.y - n1.y;
+        const dist = Math.max(15, Math.hypot(dx, dy));
+        const force = 400 / (dist * dist);
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        n1.vx -= fx;
+        n1.vy -= fy;
+        n2.vx += fx;
+        n2.vy += fy;
+      }
+    }
+
+    // Edge attraction
+    const nodeMap = new Map(state.graphNodes.map((n) => [n.id, n]));
+    for (const e of state.graphEdges) {
+      const n1 = nodeMap.get(e.source);
+      const n2 = nodeMap.get(e.target);
+      if (n1 && n2) {
+        const dx = n2.x - n1.x;
+        const dy = n2.y - n1.y;
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const force = (dist - 80) * 0.04;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        n1.vx += fx;
+        n1.vy += fy;
+        n2.vx -= fx;
+        n2.vy -= fy;
+      }
+    }
+
+    // Apply & gravity
+    for (const n of state.graphNodes) {
+      n.vx += (cx - n.x) * 0.02;
+      n.vy += (cy - n.y) * 0.02;
+      n.x += Math.max(-12, Math.min(12, n.vx));
+      n.y += Math.max(-12, Math.min(12, n.vy));
+      n.vx *= 0.6;
+      n.vy *= 0.6;
+      n.x = Math.max(30, Math.min(width - 30, n.x));
+      n.y = Math.max(30, Math.min(height - 30, n.y));
+    }
+
+    drawGraph();
+  }, 20);
+}
+
+function drawGraph() {
+  if (!ctx || !canvas) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const nodeMap = new Map(state.graphNodes.map((n) => [n.id, n]));
+
+  // Draw Edges
+  for (const e of state.graphEdges) {
+    const s = nodeMap.get(e.source);
+    const t = nodeMap.get(e.target);
+    if (!s || !t) continue;
+
+    const isFlagged = e.max_risk_score >= 0.7372;
+    ctx.strokeStyle = isFlagged ? "#DC2626" : "rgba(37, 99, 235, 0.35)";
+    ctx.lineWidth = isFlagged ? 2.5 : 1.2;
+
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(t.x, t.y);
+    ctx.stroke();
+
+    // Directional Arrow Head
+    const angle = Math.atan2(t.y - s.y, t.x - s.x);
+    const arrowDist = 18;
+    const ax = t.x - Math.cos(angle) * arrowDist;
+    const ay = t.y - Math.sin(angle) * arrowDist;
+
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - 7 * Math.cos(angle - Math.PI / 6), ay - 7 * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(ax - 7 * Math.cos(angle + Math.PI / 6), ay - 7 * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Draw Nodes
+  for (const n of state.graphNodes) {
+    const isSelected = state.selectedNode && state.selectedNode.id === n.id;
+    const isFlagged = n.is_flagged;
+
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, isSelected ? 12 : 9, 0, 2 * Math.PI);
+    ctx.fillStyle = isFlagged ? "#DC2626" : "#2563EB";
+    ctx.fill();
+
+    ctx.strokeStyle = isSelected ? "#0F172A" : "#FFFFFF";
+    ctx.lineWidth = isSelected ? 3 : 2;
+    ctx.stroke();
+
+    // Label
+    ctx.font = "10px Inter, sans-serif";
+    ctx.fillStyle = "#0F172A";
+    ctx.textAlign = "center";
+    ctx.fillText(n.id, n.x, n.y + 20);
+  }
+}
+
+function drawEmptyGraph(msg) {
+  if (!ctx || !canvas) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#64748B";
+  ctx.font = "13px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(msg, canvas.width / 2, canvas.height / 2);
+}
+
+async function inspectAccount(accountId) {
+  const title = document.getElementById("panel-entity-title");
+  const content = document.getElementById("panel-entity-content");
+  if (!title || !content) return;
+
+  title.textContent = `Account: ${accountId}`;
+  content.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px;">Loading account history...</div>`;
+
+  try {
+    const res = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/account/${encodeURIComponent(accountId)}`);
+    if (!res.ok) throw new Error("Account query failed");
+    const acc = await res.json();
+
+    content.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+        <div style="background: var(--bg-card-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-card);">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: var(--text-muted); font-size: 11px;">ACTIVITY SUMMARY</span>
+            <span class="risk-badge ${acc.flagged_transactions > 0 ? "flagged" : "normal"}">${acc.flagged_transactions} Flagged</span>
+          </div>
+          <div><strong>Total Transactions:</strong> ${acc.total_transactions}</div>
+          <div><strong>Total Volume Sent:</strong> $${Number(acc.total_sent).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div><strong>Total Volume Received:</strong> $${Number(acc.total_received).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">CONNECTED COUNTERPARTIES (${acc.counterparties.length})</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+            ${acc.counterparties.map((c) => `<span class="session-pill mono">${c}</span>`).join("")}
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">TRANSACTION LOG</div>
+          <div style="display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto;">
+            ${acc.transactions
+              .map(
+                (t) => `
+              <div style="padding: 8px; border: 1px solid var(--border-subtle); border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                <div>
+                  <div class="mono" style="font-weight: 600;">${t.id} &bull; $${Number(t.amount).toLocaleString()}</div>
+                  <div style="font-size: 10px; color: var(--text-muted);">${t.from_account === accountId ? `To &rarr; ${t.to_account}` : `From &larr; ${t.from_account}`}</div>
+                </div>
+                <div style="text-align: right;">
+                  <span class="mono ${t.classification === "FLAGGED" ? "text-danger" : ""}" style="font-weight: 600;">${Number(t.risk_score).toFixed(4)}</span>
+                  <div><button class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px;" onclick="inspectTransaction('${t.id}')">View</button></div>
+                </div>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    content.innerHTML = `<div style="color: var(--color-flagged); font-size: 12px;">Failed to inspect account: ${err.message}</div>`;
+  }
+}
+
+// ============================================================================
+// 5. TRANSACTION EXPLANATION & ATTENTION
+// ============================================================================
+
+async function loadTransactionExplanation(txId) {
+  const expTxId = document.getElementById("exp-tx-id");
+  const expTime = document.getElementById("exp-tx-time");
+  const expSender = document.getElementById("exp-tx-sender");
+  const expReceiver = document.getElementById("exp-tx-receiver");
+  const expAmount = document.getElementById("exp-tx-amount");
+  const expScore = document.getElementById("exp-tx-score");
+  const attnBody = document.getElementById("exp-attention-body");
+  const evBody = document.getElementById("exp-evidence-body");
+
+  try {
+    const res = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/transaction/${encodeURIComponent(txId)}`);
+    if (!res.ok) throw new Error("Transaction fetch error");
+    const tx = await res.json();
+
+    // Populate Header
+    expTxId.textContent = tx.id;
+    expTime.textContent = tx.timestamp_str || formatTimestamp(tx.timestamp);
+    expSender.textContent = tx.from_account;
+    expReceiver.textContent = tx.to_account;
+    expAmount.textContent = `$${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    expScore.textContent = Number(tx.risk_score).toFixed(4);
+    expScore.style.color = tx.classification === "FLAGGED" ? "var(--color-flagged)" : "var(--text-primary)";
+
+    // Section A: Model Attribution
+    if (!tx.has_history) {
+      attnBody.innerHTML = `
+        <div style="padding: 16px; background: var(--color-warning-bg); border: 1px solid var(--color-warning-border); border-radius: var(--radius-sm); font-size: 13px; color: #92400E;">
+          <strong>Model attribution not available (no prior temporal neighbors).</strong>
+          <p style="margin-top: 4px; font-size: 12px;">This transaction involves isolated accounts with zero prior interactions recorded before this timestamp. Score relies entirely on tabular transaction properties.</p>
+        </div>
+      `;
+    } else {
+      const senderNeighbors = tx.sender_attention.neighbors || [];
+      const receiverNeighbors = tx.receiver_attention.neighbors || [];
+
+      attnBody.innerHTML = `
+        <div class="attention-grid">
+          <!-- Sender Attention -->
+          <div class="attention-card">
+            <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Sender Account Counterparties (${senderNeighbors.length})</div>
+            ${
+              senderNeighbors.length === 0
+                ? `<div style="font-size: 12px; color: var(--text-muted);">No prior sender interactions.</div>`
+                : senderNeighbors
+                    .map(
+                      (n) => `
+              <div class="neighbor-attention-row">
+                <div>
+                  <div class="neighbor-partner">${n.partner}</div>
+                  <div style="font-size: 10px; color: var(--text-muted);">&Delta;t: ${formatDelta(n.delta_seconds)}</div>
+                </div>
+                <div style="text-align: right;">
+                  <span class="attention-pill">&alpha;<sub>L2</sub>: ${(n.attention_l2 * 100).toFixed(1)}%</span>
+                  <div style="font-size: 10px; color: var(--text-muted);">&alpha;<sub>L1</sub>: ${(n.attention_l1 * 100).toFixed(1)}%</div>
+                </div>
+              </div>
+            `
+                    )
+                    .join("")
+            }
+          </div>
+
+          <!-- Receiver Attention -->
+          <div class="attention-card">
+            <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Receiver Account Counterparties (${receiverNeighbors.length})</div>
+            ${
+              receiverNeighbors.length === 0
+                ? `<div style="font-size: 12px; color: var(--text-muted);">No prior receiver interactions.</div>`
+                : receiverNeighbors
+                    .map(
+                      (n) => `
+              <div class="neighbor-attention-row">
+                <div>
+                  <div class="neighbor-partner">${n.partner}</div>
+                  <div style="font-size: 10px; color: var(--text-muted);">&Delta;t: ${formatDelta(n.delta_seconds)}</div>
+                </div>
+                <div style="text-align: right;">
+                  <span class="attention-pill">&alpha;<sub>L2</sub>: ${(n.attention_l2 * 100).toFixed(1)}%</span>
+                  <div style="font-size: 10px; color: var(--text-muted);">&alpha;<sub>L1</sub>: ${(n.attention_l1 * 100).toFixed(1)}%</div>
+                </div>
+              </div>
+            `
+                    )
+                    .join("")
+            }
+          </div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">
+          * &alpha;<sub>L1</sub> and &alpha;<sub>L2</sub> denote learned softmax attention weights over past counterparty edges in TGAT multi-head attention.
+        </div>
+      `;
+    }
+
+    // Section B: Empirical Evidence
+    const evidenceList = tx.explainability.evidence || [];
+    evBody.innerHTML = `
+      <div style="margin-bottom: 12px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--text-muted);">SUMMARY ATTRIBUTION:</div>
+        <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-top: 2px;">${tx.explainability.summary}</div>
+      </div>
+      <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">FACTUAL TRANSACTION CONTEXT:</div>
+      <div class="evidence-list">
+        ${evidenceList.map((e) => `<div class="evidence-item"><span class="evidence-bullet"></span><span>${e}</span></div>`).join("")}
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 14px; font-style: italic;">
+        Note: Empirical attributes are factual behavioral markers extracted from chronological transaction logs, provided strictly as investigator context.
+      </div>
+    `;
+  } catch (err) {
+    attnBody.innerHTML = `<div style="color: var(--color-flagged); font-size: 12px;">Failed to load explanation: ${err.message}</div>`;
+  }
+}
+
+// ============================================================================
+// 6. MODEL PERFORMANCE VIEW
+// ============================================================================
+
+function initPerformanceView() {
+  // Handled dynamically on tab entry
+}
+
+async function loadPerformance() {
+  try {
+    const [metricsRes, ablRes] = await Promise.all([
+      fetch("/api/metrics"),
+      fetch("/api/ablations"),
+    ]);
+
+    if (!metricsRes.ok || !ablRes.ok) return;
+
+    const metricsData = await metricsRes.json();
+    const ablData = await ablRes.json();
+
+    // Baseline Table
+    const baselinesTbody = document.getElementById("perf-baselines-tbody");
+    if (baselinesTbody) {
+      const b = metricsData.baselines || {};
+      const tgatFrozen = metricsData.tgat_frozen_test || {};
+      const tgatOfficial = metricsData.tgat_official_metrics || {};
+
+      baselinesTbody.innerHTML = `
+        <tr style="background-color: var(--accent-blue-subtle);">
+          <td><strong>TGAT (Frozen &tau;* = 0.7372)</strong></td>
+          <td><span class="mono" style="font-weight: 700; color: var(--color-success);">0.9022</span></td>
+          <td><span class="mono" style="font-weight: 700; color: var(--color-success);">0.0184</span></td>
+          <td><span class="mono" style="font-weight: 700; color: var(--color-success);">0.0504</span></td>
+          <td class="mono"><strong>4.55%</strong></td>
+          <td class="mono">5.65%</td>
+          <td class="mono" style="color: var(--color-success); font-weight: 700;">357</td>
+          <td><span class="risk-badge" style="background: #E0E7FF; color: #3730A3;">Dynamic Edge Attention</span></td>
+        </tr>
+        <tr>
+          <td>TGAT (Default Threshold 0.50)</td>
+          <td class="mono">0.9022</td>
+          <td class="mono">0.0184</td>
+          <td class="mono">0.0364</td>
+          <td class="mono">1.91%</td>
+          <td class="mono">42.86%</td>
+          <td class="mono">2,198</td>
+          <td><span class="risk-badge" style="background: #E0E7FF; color: #3730A3;">Dynamic Edge Attention</span></td>
+        </tr>
+        <tr>
+          <td>Temporal XGBoost</td>
+          <td class="mono">0.9175</td>
+          <td class="mono">0.0280</td>
+          <td class="mono">0.0781</td>
+          <td class="mono">4.16%</td>
+          <td class="mono">58.47%</td>
+          <td class="mono">4,040</td>
+          <td>Global Feature Importance (Black-box)</td>
+        </tr>
+        <tr>
+          <td>Tabular XGBoost</td>
+          <td class="mono">0.8901</td>
+          <td class="mono">0.0305</td>
+          <td class="mono">0.0180</td>
+          <td class="mono">0.91%</td>
+          <td class="mono">80.40%</td>
+          <td class="mono">26,399</td>
+          <td>Global Feature Importance (Black-box)</td>
+        </tr>
+        <tr>
+          <td>Logistic Regression</td>
+          <td class="mono">0.8270</td>
+          <td class="mono">0.0049</td>
+          <td class="mono">0.0023</td>
+          <td class="mono">0.11%</td>
+          <td class="mono">99.67%</td>
+          <td class="mono">263,840</td>
+          <td>Linear Feature Weights</td>
+        </tr>
+        <tr style="background-color: #FEF2F2;">
+          <td><strong style="color: #991B1B;">Static GCN (FAILED)</strong></td>
+          <td class="mono" style="color: #DC2626;">0.6064</td>
+          <td class="mono" style="color: #DC2626;">0.0017</td>
+          <td class="mono" style="color: #DC2626;">0.0038</td>
+          <td class="mono">0.19%</td>
+          <td class="mono">7.64%</td>
+          <td class="mono">1,177</td>
+          <td style="color: #991B1B; font-size: 11px;">Failed: Collapsing time causes future leakage & topological smearing</td>
+        </tr>
+      `;
+    }
+
+    // Ablations Table
+    const ablTbody = document.getElementById("perf-ablations-tbody");
+    if (ablTbody && ablData.experiments) {
+      ablTbody.innerHTML = ablData.experiments
+        .map(
+          (r) => `
+        <tr>
+          <td class="mono"><strong>${r.id}</strong></td>
+          <td>${getAblationDescription(r.name)}</td>
+          <td class="mono">${r.val_roc_auc ? r.val_roc_auc.toFixed(4) : "—"}</td>
+          <td class="mono" style="font-weight: 600;">${r.test_roc_auc ? r.test_roc_auc.toFixed(4) : "—"}</td>
+          <td class="mono">${r.test_pr_auc ? r.test_pr_auc.toFixed(4) : "—"}</td>
+          <td class="mono">${r.test_f1 !== undefined ? r.test_f1.toFixed(4) : "—"}</td>
+          <td class="mono">${r.test_p100 !== undefined ? (r.test_p100 * 100).toFixed(1) + "%" : "—"}</td>
+          <td class="mono">${r.training_seconds ? Math.round(r.training_seconds) + "s" : "—"}</td>
+        </tr>
+      `
+        )
+        .join("");
+    }
+  } catch (err) {
+    console.warn("Failed to load performance metrics:", err);
   }
 }
 
@@ -273,587 +1201,18 @@ function getAblationDescription(name) {
   return "Architecture variant";
 }
 
-/* ==========================================================================
-   Interactive Canvas Force-Directed Graph Engine
-   ========================================================================== */
-let canvas, ctx;
+// ============================================================================
+// HELPER UTILITIES
+// ============================================================================
 
-function initGraphCanvas() {
-  canvas = document.getElementById("graph-canvas");
-  if (!canvas) return;
-  ctx = canvas.getContext("2d");
-
-  window.addEventListener("resize", resizeCanvas);
-  resizeCanvas();
-
-  // Canvas interaction event listeners
-  canvas.addEventListener("mousedown", handleMouseDown);
-  canvas.addEventListener("mousemove", handleMouseMove);
-  canvas.addEventListener("mouseup", handleMouseUp);
-  canvas.addEventListener("wheel", handleWheel);
-
-  const select = document.getElementById("ring-select");
-  if (select) {
-    select.addEventListener("change", (e) => loadGraphForCase(e.target.value));
-  }
-
-  const animBtn = document.getElementById("btn-toggle-animation");
-  if (animBtn) {
-    animBtn.addEventListener("click", () => {
-      state.graph.isAnimating = !state.graph.isAnimating;
-      animBtn.innerHTML = state.graph.isAnimating ? '<span class="btn-icon">⏸</span> Pause Flow' : '<span class="btn-icon">▶</span> Animate Flow';
-    });
-  }
-
-  const resetBtn = document.getElementById("btn-reset-view");
-  if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
-      state.graph.transform = { x: 0, y: 0, scale: 1 };
-      layoutNodes(canvas.width, canvas.height);
-    });
-  }
-
-  const simBtn = document.getElementById("btn-simulate-ring");
-  if (simBtn) {
-    simBtn.addEventListener("click", () => {
-      if (state.currentCase) {
-        loadCaseIntoSimulator(state.currentCase.id);
-      }
-    });
-  }
-
-  // Start Animation Loop
-  requestAnimationFrame(animationLoop);
+function formatTimestamp(tsSec) {
+  if (!tsSec) return "—";
+  const d = new Date(tsSec * 1000);
+  return d.toISOString().replace("T", " ").substring(0, 19);
 }
 
-function resizeCanvas() {
-  if (!canvas) return;
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * window.devicePixelRatio;
-  canvas.height = rect.height * window.devicePixelRatio;
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  layoutNodes(rect.width, rect.height);
-}
-
-function loadGraphForCase(caseId) {
-  const c = state.cases.find((item) => item.id === caseId);
-  if (!c || !c.graph) return;
-
-  state.currentCase = c;
-  state.graph.nodes = JSON.parse(JSON.stringify(c.graph.nodes));
-  state.graph.edges = JSON.parse(JSON.stringify(c.graph.edges));
-  state.graph.selectedNode = null;
-  state.graph.selectedEdge = null;
-
-  const rect = canvas ? canvas.parentElement.getBoundingClientRect() : { width: 800, height: 500 };
-  layoutNodes(rect.width, rect.height);
-  initParticles();
-  updateInspector();
-}
-
-function layoutNodes(width, height) {
-  const nodes = state.graph.nodes;
-  if (!nodes || nodes.length === 0) return;
-
-  const cx = width / 2;
-  const cy = height / 2;
-  const radius = Math.min(width, height) * 0.35;
-
-  if (nodes.length === 2) {
-    nodes[0].x = cx - 180;
-    nodes[0].y = cy;
-    nodes[1].x = cx + 180;
-    nodes[1].y = cy;
-  } else if (nodes.some((n) => n.role === "hub")) {
-    // Star / Fan-out layout
-    const hub = nodes.find((n) => n.role === "hub");
-    hub.x = cx;
-    hub.y = cy;
-    const spokes = nodes.filter((n) => n !== hub);
-    spokes.forEach((n, i) => {
-      const angle = (i / spokes.length) * Math.PI * 2;
-      n.x = cx + radius * Math.cos(angle);
-      n.y = cy + radius * Math.sin(angle);
-    });
-  } else {
-    // Circle / Ring layout
-    nodes.forEach((n, i) => {
-      const angle = (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
-      n.x = cx + radius * Math.cos(angle);
-      n.y = cy + radius * Math.sin(angle);
-    });
-  }
-}
-
-function initParticles() {
-  state.graph.particles = [];
-  state.graph.edges.forEach((edge, edgeIdx) => {
-    for (let i = 0; i < 3; i++) {
-      state.graph.particles.push({
-        edgeIdx: edgeIdx,
-        progress: Math.random(),
-        speed: 0.006 + (edge.attention || 0.2) * 0.012,
-      });
-    }
-  });
-}
-
-function animationLoop() {
-  if (canvas && ctx) {
-    drawGraph();
-  }
-  requestAnimationFrame(animationLoop);
-}
-
-function drawGraph() {
-  const w = canvas.width / window.devicePixelRatio;
-  const h = canvas.height / window.devicePixelRatio;
-
-  ctx.clearRect(0, 0, w, h);
-  ctx.save();
-  ctx.translate(state.graph.transform.x, state.graph.transform.y);
-  ctx.scale(state.graph.transform.scale, state.graph.transform.scale);
-
-  // 1. Draw Edges
-  state.graph.edges.forEach((edge) => {
-    const fromNode = state.graph.nodes.find((n) => n.id === edge.from);
-    const toNode = state.graph.nodes.find((n) => n.id === edge.to);
-    if (!fromNode || !toNode) return;
-
-    const isHighAttn = (edge.attention || 0) > 0.4;
-    const isSelected = state.graph.selectedEdge === edge;
-
-    ctx.beginPath();
-    ctx.moveTo(fromNode.x, fromNode.y);
-    ctx.lineTo(toNode.x, toNode.y);
-
-    if (isSelected) {
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 4;
-    } else if (isHighAttn) {
-      ctx.strokeStyle = "rgba(0, 242, 254, 0.85)";
-      ctx.lineWidth = 3.5;
-      ctx.shadowColor = "#00f2fe";
-      ctx.shadowBlur = 10;
-    } else {
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.3)";
-      ctx.lineWidth = 1.5;
-      ctx.shadowBlur = 0;
-    }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Edge Label (Attention & Amount)
-    const midX = (fromNode.x + toNode.x) / 2;
-    const midY = (fromNode.y + toNode.y) / 2;
-    ctx.fillStyle = "rgba(15, 23, 42, 0.8)";
-    ctx.fillRect(midX - 35, midY - 12, 70, 20);
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-    ctx.strokeRect(midX - 35, midY - 12, 70, 20);
-
-    ctx.fillStyle = isHighAttn ? "#00f2fe" : "#94a3b8";
-    ctx.font = "10px JetBrains Mono";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`α: ${(edge.attention || 0).toFixed(2)}`, midX, midY - 2);
-  });
-
-  // 2. Animate Money Flow Particles
-  if (state.graph.isAnimating) {
-    state.graph.particles.forEach((p) => {
-      const edge = state.graph.edges[p.edgeIdx];
-      if (!edge) return;
-      const fromNode = state.graph.nodes.find((n) => n.id === edge.from);
-      const toNode = state.graph.nodes.find((n) => n.id === edge.to);
-      if (!fromNode || !toNode) return;
-
-      p.progress += p.speed;
-      if (p.progress > 1) p.progress = 0;
-
-      const px = fromNode.x + (toNode.x - fromNode.x) * p.progress;
-      const py = fromNode.y + (toNode.y - fromNode.y) * p.progress;
-
-      ctx.beginPath();
-      ctx.arc(px, py, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = (edge.attention || 0) > 0.4 ? "#00f2fe" : "#38bdf8";
-      ctx.shadowColor = "#00f2fe";
-      ctx.shadowBlur = 8;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    });
-  }
-
-  // 3. Draw Nodes
-  state.graph.nodes.forEach((node) => {
-    const isSelected = state.graph.selectedNode === node;
-    const radius = node.role === "hub" ? 22 : 16;
-
-    // Outer Glow / Ring
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, radius + (isSelected ? 6 : 3), 0, Math.PI * 2);
-    ctx.fillStyle = getNodeRoleColor(node.role, 0.25);
-    ctx.fill();
-
-    // Core Node Circle
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = getNodeRoleColor(node.role, 0.95);
-    ctx.shadowColor = getNodeRoleColor(node.role, 1);
-    ctx.shadowBlur = isSelected ? 18 : 8;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    ctx.lineWidth = isSelected ? 3 : 1.5;
-    ctx.strokeStyle = "#ffffff";
-    ctx.stroke();
-
-    // Node Label
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "11px Inter";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText(node.label || node.id, node.x, node.y + radius + 6);
-  });
-
-  ctx.restore();
-}
-
-function getNodeRoleColor(role, alpha = 1) {
-  switch (role) {
-    case "hub":
-      return `rgba(239, 68, 68, ${alpha})`;
-    case "mule":
-      return `rgba(245, 158, 11, ${alpha})`;
-    case "shell":
-      return `rgba(168, 85, 247, ${alpha})`;
-    case "receiver":
-      return `rgba(0, 242, 254, ${alpha})`;
-    case "sender":
-      return `rgba(56, 189, 248, ${alpha})`;
-    default:
-      return `rgba(148, 163, 184, ${alpha})`;
-  }
-}
-
-// Mouse Events for Canvas
-function handleMouseDown(e) {
-  const rect = canvas.getBoundingClientRect();
-  const mouseX = (e.clientX - rect.left - state.graph.transform.x) / state.graph.transform.scale;
-  const mouseY = (e.clientY - rect.top - state.graph.transform.y) / state.graph.transform.scale;
-
-  // Check Node hit
-  for (const node of state.graph.nodes) {
-    const dist = Math.hypot(node.x - mouseX, node.y - mouseY);
-    if (dist <= 25) {
-      state.graph.dragNode = node;
-      state.graph.selectedNode = node;
-      state.graph.selectedEdge = null;
-      updateInspector();
-      return;
-    }
-  }
-
-  // Check Edge hit
-  for (const edge of state.graph.edges) {
-    const fromNode = state.graph.nodes.find((n) => n.id === edge.from);
-    const toNode = state.graph.nodes.find((n) => n.id === edge.to);
-    if (!fromNode || !toNode) continue;
-
-    const dist = distanceToSegment(mouseX, mouseY, fromNode.x, fromNode.y, toNode.x, toNode.y);
-    if (dist < 10) {
-      state.graph.selectedEdge = edge;
-      state.graph.selectedNode = null;
-      updateInspector();
-      return;
-    }
-  }
-
-  // Pan Canvas
-  state.graph.isPanning = true;
-  state.graph.panStart = { x: e.clientX - state.graph.transform.x, y: e.clientY - state.graph.transform.y };
-}
-
-function handleMouseMove(e) {
-  if (state.graph.dragNode) {
-    const rect = canvas.getBoundingClientRect();
-    state.graph.dragNode.x = (e.clientX - rect.left - state.graph.transform.x) / state.graph.transform.scale;
-    state.graph.dragNode.y = (e.clientY - rect.top - state.graph.transform.y) / state.graph.transform.scale;
-  } else if (state.graph.isPanning) {
-    state.graph.transform.x = e.clientX - state.graph.panStart.x;
-    state.graph.transform.y = e.clientY - state.graph.panStart.y;
-  }
-}
-
-function handleMouseUp() {
-  state.graph.dragNode = null;
-  state.graph.isPanning = false;
-}
-
-function handleWheel(e) {
-  e.preventDefault();
-  const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-  state.graph.transform.scale = Math.min(Math.max(state.graph.transform.scale * zoomFactor, 0.4), 3.0);
-}
-
-function distanceToSegment(x, y, x1, y1, x2, y2) {
-  const A = x - x1;
-  const B = y - y1;
-  const C = x2 - x1;
-  const D = y2 - y1;
-  const dot = A * C + B * D;
-  const len_sq = C * C + D * D;
-  let param = -1;
-  if (len_sq !== 0) param = dot / len_sq;
-  let xx, yy;
-  if (param < 0) {
-    xx = x1;
-    yy = y1;
-  } else if (param > 1) {
-    xx = x2;
-    yy = y2;
-  } else {
-    xx = x1 + param * C;
-    yy = y1 + param * D;
-  }
-  return Math.hypot(x - xx, y - yy);
-}
-
-function updateInspector() {
-  const container = document.getElementById("inspector-content");
-  const badge = document.getElementById("inspector-badge");
-  if (!container) return;
-
-  if (state.graph.selectedNode) {
-    const n = state.graph.selectedNode;
-    badge.innerText = "Account Node";
-    container.innerHTML = `
-      <div class="inspector-field">
-        <div class="field-name">Account Identifier</div>
-        <div class="field-value mono">${n.id}</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">Ring Role</div>
-        <div class="field-value">${n.role.toUpperCase()}</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">Risk Assessment</div>
-        <div class="field-value ${n.risk === "CRITICAL" ? "text-crimson" : "text-amber"}">${n.risk || "HIGH"}</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">TGAT Predicted Risk</div>
-        <div class="field-value text-cyan">${((n.score || 0.8) * 100).toFixed(1)}%</div>
-      </div>
-    `;
-  } else if (state.graph.selectedEdge) {
-    const e = state.graph.selectedEdge;
-    badge.innerText = "Transaction Edge";
-    container.innerHTML = `
-      <div class="inspector-field">
-        <div class="field-name">From Account</div>
-        <div class="field-value mono">${e.from}</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">To Account</div>
-        <div class="field-value mono">${e.to}</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">Transaction Amount</div>
-        <div class="field-value">$${Number(e.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">TGAT Attention Weight (α)</div>
-        <div class="field-value text-cyan">${(e.attention || 0).toFixed(4)}</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">Attention Conviction</div>
-        <div class="field-value">${(e.attention || 0) > 0.4 ? "CRITICAL (High Attention Focus)" : "Normal / Distributed"}</div>
-      </div>
-    `;
-  } else {
-    badge.innerText = "Active Ring Summary";
-    const c = state.currentCase;
-    container.innerHTML = c
-      ? `
-      <div class="inspector-field">
-        <div class="field-name">Ring Typology</div>
-        <div class="field-value">${c.category}</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">Active Entities</div>
-        <div class="field-value">${state.graph.nodes.length} Accounts, ${state.graph.edges.length} Transfers</div>
-      </div>
-      <div class="inspector-field">
-        <div class="field-name">Ring Risk Score</div>
-        <div class="field-value text-cyan">${(c.score * 100).toFixed(1)}%</div>
-      </div>
-      <p style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">
-        Click any node or edge in the graph view to inspect specific counterparty attributes.
-      </p>
-    `
-      : "";
-  }
-}
-
-/* ==========================================================================
-   Live Inference Simulator
-   ========================================================================== */
-function initSimulator() {
-  const form = document.getElementById("tx-sim-form");
-  const presetSelect = document.getElementById("preset-select");
-
-  if (presetSelect) {
-    presetSelect.addEventListener("change", (e) => {
-      const val = e.target.value;
-      if (val === "case1") {
-        document.getElementById("input-sender").value = "81156E7A0";
-        document.getElementById("input-receiver").value = "81156E840";
-        document.getElementById("input-amount").value = "189.19";
-        document.getElementById("input-amount-paid").value = "189.19";
-        document.getElementById("check-cross-bank").checked = true;
-      } else if (val === "case2") {
-        document.getElementById("input-sender").value = "10042B660";
-        document.getElementById("input-receiver").value = "807095B40";
-        document.getElementById("input-amount").value = "92542.99";
-        document.getElementById("input-amount-paid").value = "92542.99";
-        document.getElementById("check-cross-bank").checked = true;
-      } else if (val === "case3") {
-        document.getElementById("input-sender").value = "803A2F1A0";
-        document.getElementById("input-receiver").value = "803A2F330";
-        document.getElementById("input-amount").value = "31778.85";
-        document.getElementById("input-amount-paid").value = "31778.85";
-        document.getElementById("check-cross-bank").checked = true;
-      } else if (val === "clean") {
-        document.getElementById("input-sender").value = "8018B08B0";
-        document.getElementById("input-receiver").value = "8005A0470";
-        document.getElementById("input-amount").value = "240.00";
-        document.getElementById("input-amount-paid").value = "240.00";
-        document.getElementById("check-cross-bank").checked = false;
-      }
-    });
-  }
-
-  if (form) {
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      await executeSimulation();
-    });
-  }
-}
-
-async function executeSimulation() {
-  const sender = document.getElementById("input-sender").value.trim();
-  const receiver = document.getElementById("input-receiver").value.trim();
-  const amount = parseFloat(document.getElementById("input-amount").value);
-  const amountPaid = parseFloat(document.getElementById("input-amount-paid").value);
-  const crossBank = document.getElementById("check-cross-bank").checked;
-  const sameCurrency = document.getElementById("check-same-currency").checked;
-  const isWeekend = document.getElementById("check-weekend").checked;
-
-  const btn = document.getElementById("btn-run-inference");
-  btn.disabled = true;
-  btn.innerHTML = "Computing TGAT Attention...";
-
-  try {
-    const payload = {
-      from_account: sender,
-      to_account: receiver,
-      amount: amount,
-      amount_paid: amountPaid,
-      cross_bank: crossBank,
-      same_bank: !crossBank,
-      same_currency: sameCurrency,
-      is_weekend: isWeekend,
-    };
-
-    const res = await fetch("/api/predict", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) throw new Error("Inference API error");
-    const result = await res.json();
-    renderSimulationResults(result);
-    showToast(`Inference complete: ${result.decision}`);
-  } catch (err) {
-    console.error("Simulation error:", err);
-    // Client-side fallback computation
-    const fallbackProb = sender === "81156E7A0" ? 0.847 : sender === "10042B660" ? 0.824 : amount > 30000 ? 0.843 : 0.003;
-    renderSimulationResults({
-      probability: fallbackProb,
-      threshold: state.threshold,
-      decision: fallbackProb >= state.threshold ? "FRAUD_ALERT" : "LEGITIMATE_CLEAR",
-      risk_level: fallbackProb >= state.threshold ? "CRITICAL" : "LOW",
-      sender_attention: {
-        neighbors: [
-          { partner: "803A001F1", delta_seconds: 180, attention_l2: 0.54 },
-          { partner: "803A002F2", delta_seconds: 420, attention_l2: 0.28 },
-          { partner: "803A999E0", delta_seconds: 1200, attention_l2: 0.18 },
-        ],
-      },
-      explainability: {
-        summary: fallbackProb >= state.threshold ? "Risk score exceeds 73.7% frozen threshold. High temporal attention on previous burst transactions." : "Normal score below 73.7% threshold. Attention is evenly distributed across baseline activity.",
-      },
-    });
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Execute TGAT Inference';
-  }
-}
-
-function renderSimulationResults(res) {
-  const scoreVal = document.getElementById("sim-score-val");
-  const dial = document.getElementById("score-dial");
-  const verdictText = document.getElementById("sim-verdict-text");
-  const verdictDesc = document.getElementById("sim-verdict-desc");
-  const verdictTag = document.getElementById("sim-verdict-tag");
-
-  const prob = res.probability;
-  const isAlert = res.decision === "FRAUD_ALERT";
-
-  scoreVal.innerText = `${(prob * 100).toFixed(1)}%`;
-  dial.className = `score-circle ${isAlert ? "fraud-alert" : "clean"}`;
-
-  verdictText.className = `verdict-headline ${isAlert ? "alert" : "clear"}`;
-  verdictText.innerText = isAlert ? "CRITICAL ALERT: LAUNDERING DETECTED" : "CLEAR: NORMAL TRANSACTION";
-  verdictTag.className = `badge-tag ${isAlert ? "green" : "neutral"}`;
-  verdictTag.innerText = res.risk_level;
-
-  verdictDesc.innerText = res.explainability.summary;
-
-  // Render Attention Bars
-  const barsContainer = document.getElementById("attention-bars-container");
-  const neighbors = res.sender_attention?.neighbors || [];
-
-  if (neighbors.length === 0) {
-    barsContainer.innerHTML = '<div style="font-size: 11px; color: var(--text-muted);">No prior historical interactions found for this account. Model relied on baseline tabular signals.</div>';
-    return;
-  }
-
-  barsContainer.innerHTML = neighbors
-    .map((nbr) => {
-      const attn = (nbr.attention_l2 || nbr.attention_l1 || 0.1) * 100;
-      return `
-      <div class="attn-bar-item">
-        <div class="attn-label-row">
-          <span class="mono">Counterparty: ${nbr.partner}</span>
-          <span>Δt: ${Math.round(nbr.delta_seconds || 60)}s • Weight: ${attn.toFixed(1)}%</span>
-        </div>
-        <div class="attn-bar-bg">
-          <div class="attn-bar-fill" style="width: ${attn}%;"></div>
-        </div>
-      </div>
-    `;
-    })
-    .join("");
-}
-
-function showToast(msg) {
-  const container = document.getElementById("toast-container");
-  if (!container) return;
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.innerText = msg;
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 3500);
+function formatDelta(deltaSec) {
+  if (deltaSec < 60) return `${Math.round(deltaSec)}s`;
+  if (deltaSec < 3600) return `${Math.round(deltaSec / 60)}m`;
+  return `${(deltaSec / 3600).toFixed(1)}h`;
 }

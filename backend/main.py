@@ -1,23 +1,32 @@
-"""FastAPI Application for Explainable TGAT Financial Fraud Ring Detection."""
+"""FastAPI Application for Explainable TGAT Financial Fraud Ring Detection.
+
+Serves real-time TGAT inference, dynamic graph attention explainability,
+batch transaction upload analysis, interactive graph queries, and evaluation benchmarks.
+"""
 from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, Query
+import pandas as pd
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from backend.analysis_store import analysis_store
 from backend.model_service import ModelService
+from backend.validation import ValidationResult, detect_and_validate_csv
 
 app = FastAPI(
     title="Explainable TGAT Financial Fraud Ring Detection API",
-    description="Backend service providing real-time TGAT inference, dynamic graph attention explainability, and evaluation benchmarks.",
-    version="1.0.0",
+    description="Backend service providing real-time TGAT inference, dynamic graph attention explainability, batch analysis, and evaluation benchmarks.",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -53,11 +62,20 @@ class TransactionInput(BaseModel):
     custom_features: Optional[Dict[str, float]] = None
 
 
+class BatchRunRequest(BaseModel):
+    filename: str = "upload.csv"
+    csv_content: str
+
+
 @app.on_event("startup")
 def startup_event():
     # Preload model on startup
     get_model_service()
 
+
+# ============================================================================
+# SYSTEM HEALTH & BENCHMARKS
+# ============================================================================
 
 @app.get("/api/health")
 def health():
@@ -123,9 +141,7 @@ def get_threshold_details():
     sweep_csv = Path("results/threshold_analysis/tgat/validation_sweep.csv")
     sweep_data = []
     if sweep_csv.exists():
-        import pandas as pd
         df = pd.read_csv(sweep_csv)
-        # Sample 50 points evenly for fast client rendering
         step = max(1, len(df) // 50)
         sampled = df.iloc[::step]
         sweep_data = sampled.to_dict(orient="records")
@@ -252,6 +268,201 @@ def predict_transaction(input_data: TransactionInput):
         feature_dict=features,
     )
     return result
+
+
+# ============================================================================
+# NEW WORKFLOW: UPLOAD, VALIDATE, ANALYSE, RESULTS & GRAPH
+# ============================================================================
+
+@app.post("/api/analysis/upload")
+async def upload_csv_file(request: Request):
+    """Upload and validate a transaction CSV file."""
+    content_type = request.headers.get("content-type", "")
+    filename = request.headers.get("x-filename", "upload.csv")
+    body = await request.body()
+    if "application/json" in content_type:
+        try:
+            data = json.loads(body.decode("utf-8"))
+            content = data.get("csv_content", "").encode("utf-8")
+            filename = data.get("filename", filename)
+        except Exception:
+            content = body
+    else:
+        content = body
+
+    val_result, _ = detect_and_validate_csv(content, filename=filename)
+    return {
+        "filename": filename,
+        "size_bytes": len(content),
+        "validation": val_result,
+    }
+
+
+@app.post("/api/analysis/validate")
+def validate_csv_content(payload: BatchRunRequest):
+    """Validate raw CSV text content and return diagnostics."""
+    content = payload.csv_content.encode("utf-8")
+    val_result, _ = detect_and_validate_csv(content, filename=payload.filename)
+    return val_result
+
+
+@app.post("/api/analysis/run")
+def run_batch_analysis(payload: BatchRunRequest):
+    """Execute causal batch TGAT scoring on validated CSV content."""
+    ms = get_model_service()
+    content = payload.csv_content.encode("utf-8")
+    val_result, valid_df = detect_and_validate_csv(content, filename=payload.filename)
+
+    if not val_result.valid or valid_df is None or len(valid_df) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file failed schema validation. Correct errors before running.")
+
+    t0 = time.time()
+    scored_records = ms.predict_batch(valid_df, causal=True)
+    duration = time.time() - t0
+
+    session = analysis_store.add_session(
+        filename=payload.filename,
+        transactions=scored_records,
+        threshold=ms.threshold,
+        warnings=val_result.warnings,
+        duration_seconds=duration,
+    )
+
+    return {
+        "status": "success",
+        "session_id": session.session_id,
+        "filename": session.filename,
+        "total_transactions": session.total_transactions,
+        "flagged_transactions": session.flagged_transactions,
+        "flagged_rate": session.flagged_rate,
+        "distinct_accounts": session.distinct_accounts,
+        "threshold": session.threshold,
+        "duration_seconds": session.duration_seconds,
+        "warnings": session.warnings,
+    }
+
+
+@app.get("/api/analysis/sample")
+def get_sample_benchmark_data(count: int = Query(50, ge=10, le=200)):
+    """Return a real sample from test.csv for instant 5-minute academic demonstration."""
+    ms = get_model_service()
+    try:
+        sample_df = ms.get_benchmark_sample(count=count)
+        csv_str = sample_df.to_csv(index=False)
+        return {
+            "filename": f"ibm_aml_benchmark_sample_{count}tx.csv",
+            "row_count": len(sample_df),
+            "csv_content": csv_str,
+            "preview": sample_df.head(5).to_dict(orient="records"),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate sample: {str(e)}")
+
+
+@app.get("/api/analysis/overview")
+def get_analysis_overview(session_id: Optional[str] = Query(None)):
+    """Return summary statistics, histogram distribution, and top flagged alerts for selected analysis."""
+    session = analysis_store.get_session(session_id)
+    if not session:
+        return {
+            "has_data": False,
+            "message": "No transaction analyses run yet. Upload a transaction CSV to begin.",
+        }
+
+    top_flagged = [t for t in session.transactions if t["classification"] == "FLAGGED"][:5]
+
+    return {
+        "has_data": True,
+        "session_id": session.session_id,
+        "filename": session.filename,
+        "created_at": session.created_at,
+        "total_transactions": session.total_transactions,
+        "flagged_transactions": session.flagged_transactions,
+        "flagged_rate": session.flagged_rate,
+        "distinct_accounts": session.distinct_accounts,
+        "threshold": session.threshold,
+        "duration_seconds": session.duration_seconds,
+        "score_distribution": session.score_distribution,
+        "warnings": session.warnings,
+        "recent_flagged": top_flagged,
+    }
+
+
+@app.get("/api/analysis/sessions")
+def list_analysis_sessions():
+    """List all completed analysis sessions."""
+    return {"sessions": analysis_store.list_sessions()}
+
+
+@app.get("/api/analysis/{session_id}/results")
+def get_analysis_results(
+    session_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=5, le=100),
+    sort_by: str = Query("risk_score"),
+    sort_dir: str = Query("desc"),
+    search: Optional[str] = Query(None),
+    flag_filter: Optional[str] = Query(None),
+    min_score: Optional[float] = Query(None),
+    max_score: Optional[float] = Query(None),
+):
+    """Return server-side paginated, sorted, searchable results."""
+    return analysis_store.get_results(
+        session_id=session_id,
+        page=page,
+        limit=limit,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        search=search,
+        flag_filter=flag_filter,
+        min_score=min_score,
+        max_score=max_score,
+    )
+
+
+@app.get("/api/analysis/{session_id}/graph")
+def get_analysis_graph(
+    session_id: str,
+    min_score: Optional[float] = Query(None),
+    account: Optional[str] = Query(None),
+):
+    """Return connected accounts directed graph nodes and edges."""
+    return analysis_store.get_graph(
+        session_id=session_id,
+        min_score=min_score,
+        account_filter=account,
+    )
+
+
+@app.get("/api/analysis/{session_id}/transaction/{tx_id}")
+def get_transaction_detail(session_id: str, tx_id: str):
+    """Return individual transaction details including layer-wise attention distribution and factual evidence."""
+    tx = analysis_store.get_transaction(session_id, tx_id)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+    return tx
+
+
+@app.get("/api/analysis/{session_id}/account/{account_id}")
+def get_account_detail(session_id: str, account_id: str):
+    """Return account history and counterparty interaction volume."""
+    acc = analysis_store.get_account_history(session_id, account_id)
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found in analysis session.")
+    return acc
+
+
+@app.get("/api/analysis/{session_id}/export")
+def export_analysis_csv(session_id: str):
+    """Download genuine scored analysis results as CSV."""
+    csv_str = analysis_store.export_csv(session_id)
+    if not csv_str:
+        raise HTTPException(status_code=404, detail="Analysis session not found.")
+    return Response(
+        content=csv_str,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=tgat_analysis_{session_id}.csv"},
+    )
 
 
 # Mount Static Frontend
