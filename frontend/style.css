@@ -833,6 +833,7 @@ body {
   flex-direction: column;
 }
 
+/* Canvas Toolbar & Controls */
 .canvas-toolbar {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
@@ -840,17 +841,57 @@ body {
   align-items: center;
   justify-content: space-between;
   background-color: #FFFFFF;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.canvas-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvas-btn {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.canvas-btn:hover {
+  background: #E2E8F0;
+  border-color: #CBD5E1;
+}
+
+.canvas-btn.active {
+  background: var(--accent-blue);
+  color: #FFFFFF;
+  border-color: var(--accent-blue);
 }
 
 #graph-canvas {
   flex: 1;
   width: 100%;
-  height: 540px;
+  height: 560px;
   display: block;
+  cursor: grab;
+  background: radial-gradient(circle at center, #FFFFFF 0%, #F8FAFC 100%);
+}
+
+#graph-canvas:active {
+  cursor: grabbing;
 }
 
 .investigation-sidepanel {
-  width: 360px;
+  width: 400px;
   background-color: #FFFFFF;
   border: 1px solid var(--border-card);
   border-radius: var(--radius-lg);
@@ -858,47 +899,202 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-height: 600px;
+  max-height: 640px;
   overflow-y: auto;
 }
 
-/* Histogram Bars */
-.histogram-container {
+/* Sub-Navigation Tabs */
+.subnav-tabs {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  height: 120px;
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border-card);
-  margin-bottom: var(--space-2);
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-4);
+  background: #F8FAFC;
+  padding: 4px 6px 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
-.hist-col {
-  flex: 1;
+.subnav-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.subnav-btn:hover {
+  color: var(--text-primary);
+}
+
+.subnav-btn.active {
+  color: var(--accent-blue);
+  border-bottom-color: var(--accent-blue);
+  font-weight: 600;
+  background: #FFFFFF;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+/* Plain-English Layman Callout */
+.layman-callout {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: var(--space-3);
   display: flex;
   flex-direction: column;
+  gap: 4px;
+}
+
+.layman-callout.high {
+  background: #FFF1F2;
+  border: 1px solid #FECDD3;
+  color: #9F1239;
+}
+
+.layman-callout.medium {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+}
+
+.layman-callout.low {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
+}
+
+.layman-callout-title {
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
   align-items: center;
-  height: 100%;
-  justify-content: flex-end;
+  gap: 6px;
 }
 
-.hist-bar {
-  width: 100%;
-  background-color: var(--accent-blue);
-  border-radius: 2px 2px 0 0;
-  transition: height 0.3s ease;
-  min-height: 2px;
-}
-
-.hist-bar.flagged-bar {
-  background-color: var(--color-flagged);
-}
-
-.hist-label {
-  font-size: 10px;
+/* Risk Badges */
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
   font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.risk-badge.high, .risk-badge.flagged {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FCA5A5;
+}
+
+.risk-badge.medium {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+
+.risk-badge.low, .risk-badge.normal {
+  background: #E0F2FE;
+  color: #075985;
+  border: 1px solid #BAE6FD;
+}
+
+/* Impact Tags */
+.impact-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.impact-tag.danger {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+.impact-tag.warning {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.impact-tag.safe {
+  background: #DCFCE7;
+  color: #16A34A;
+}
+
+/* Risk Factor Cards */
+.risk-factor-card {
+  padding: 10px 12px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.risk-factor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.risk-factor-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.risk-factor-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Summary Pills Bar (FraudLens Style) */
+.summary-pills-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.summary-pill-card {
+  flex: 1;
+  min-width: 140px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summary-pill-label {
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-muted);
-  margin-top: 4px;
+}
+
+.summary-pill-val {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
 }
 
 /* Attention Distributions */

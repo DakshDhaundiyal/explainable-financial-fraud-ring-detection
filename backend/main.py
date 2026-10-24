@@ -379,6 +379,11 @@ def get_analysis_overview(session_id: Optional[str] = Query(None)):
         "total_transactions": session.total_transactions,
         "flagged_transactions": session.flagged_transactions,
         "flagged_rate": session.flagged_rate,
+        "high_risk_count": session.high_risk_count,
+        "medium_risk_count": session.medium_risk_count,
+        "low_risk_count": session.low_risk_count,
+        "high_risk_accounts": session.high_risk_accounts,
+        "executive_summary": session.executive_summary,
         "distinct_accounts": session.distinct_accounts,
         "threshold": session.threshold,
         "duration_seconds": session.duration_seconds,
@@ -403,6 +408,7 @@ def get_analysis_results(
     sort_dir: str = Query("desc"),
     search: Optional[str] = Query(None),
     flag_filter: Optional[str] = Query(None),
+    risk_level: Optional[str] = Query(None),
     min_score: Optional[float] = Query(None),
     max_score: Optional[float] = Query(None),
 ):
@@ -415,6 +421,7 @@ def get_analysis_results(
         sort_dir=sort_dir,
         search=search,
         flag_filter=flag_filter,
+        risk_level=risk_level,
         min_score=min_score,
         max_score=max_score,
     )

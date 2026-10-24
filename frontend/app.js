@@ -15,10 +15,22 @@ const state = {
   resultsSort: "risk_score:desc",
   resultsSearch: "",
   resultsFlagFilter: "",
+  resultsRiskLevelFilter: "",
   selectedTransactionId: null,
+  activeTransactionData: null,
+  activeAccountData: null,
+  activeSidepanelTab: "reason",
+  activeExpTab: "factors",
   graphNodes: [],
   graphEdges: [],
+  particles: [],
+  isAnimating: true,
+  transform: { x: 0, y: 0, scale: 1 },
   selectedNode: null,
+  dragNode: null,
+  hoveredNode: null,
+  isPanning: false,
+  panStart: { x: 0, y: 0 },
 };
 
 // ============================================================================
@@ -165,7 +177,20 @@ async function loadOverview() {
     document.getElementById("kpi-flagged-count").textContent = data.flagged_transactions.toLocaleString();
     document.getElementById("kpi-flag-rate").textContent = `${data.flagged_rate}%`;
     document.getElementById("kpi-flag-rate-denom").textContent = `Denominator: ${data.flagged_transactions} / ${data.total_transactions} txs`;
-    document.getElementById("kpi-distinct-accounts").textContent = data.distinct_accounts.toLocaleString();
+    
+    const highRiskAccEl = document.getElementById("kpi-high-risk-accounts");
+    if (highRiskAccEl) {
+      highRiskAccEl.textContent = (data.high_risk_accounts !== undefined ? data.high_risk_accounts : data.flagged_transactions).toLocaleString();
+    }
+
+    // Plain-English Executive Summary Callout
+    const execCallout = document.getElementById("overview-exec-callout");
+    const execText = document.getElementById("overview-exec-text");
+    if (execCallout && execText && data.executive_summary) {
+      execCallout.style.display = "flex";
+      execCallout.className = `layman-callout ${data.flagged_transactions > 0 ? "high" : "low"}`;
+      execText.textContent = data.executive_summary;
+    }
 
     // Execution Record
     document.getElementById("meta-filename").textContent = data.filename || "upload.csv";
@@ -502,6 +527,7 @@ async function executeBatchScoring() {
 function initResultsTable() {
   const searchInput = document.getElementById("table-search-input");
   const flagFilter = document.getElementById("table-flag-filter");
+  const riskFilter = document.getElementById("table-risk-level-filter");
   const sortFilter = document.getElementById("table-sort-filter");
   const prevBtn = document.getElementById("btn-prev-page");
   const nextBtn = document.getElementById("btn-next-page");
@@ -521,6 +547,13 @@ function initResultsTable() {
   if (flagFilter) {
     flagFilter.addEventListener("change", () => {
       state.resultsFlagFilter = flagFilter.value;
+      loadResultsTable(1);
+    });
+  }
+
+  if (riskFilter) {
+    riskFilter.addEventListener("change", () => {
+      state.resultsRiskLevelFilter = riskFilter.value;
       loadResultsTable(1);
     });
   }
@@ -578,10 +611,24 @@ async function loadResultsTable(page = 1) {
 
     if (state.resultsSearch) params.append("search", state.resultsSearch);
     if (state.resultsFlagFilter) params.append("flag_filter", state.resultsFlagFilter);
+    if (state.resultsRiskLevelFilter) params.append("risk_level", state.resultsRiskLevelFilter);
 
     const res = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/results?${params.toString()}`);
     if (!res.ok) throw new Error("Results query failed");
     const data = await res.json();
+
+    // Populate Top Summary Pills (FraudLens Style)
+    const sm = data.summary || {};
+    const pillTotal = document.getElementById("pill-total-count");
+    const pillFlagged = document.getElementById("pill-flagged-count");
+    const pillHigh = document.getElementById("pill-high-count");
+    const pillMed = document.getElementById("pill-med-count");
+    const pillLow = document.getElementById("pill-low-count");
+    if (pillTotal) pillTotal.textContent = (sm.total !== undefined ? sm.total : data.total).toLocaleString();
+    if (pillFlagged) pillFlagged.textContent = (sm.flagged || 0).toLocaleString();
+    if (pillHigh) pillHigh.textContent = (sm.high_risk || 0).toLocaleString();
+    if (pillMed) pillMed.textContent = (sm.medium_risk || 0).toLocaleString();
+    if (pillLow) pillLow.textContent = (sm.low_risk || 0).toLocaleString();
 
     const items = data.items || [];
     if (items.length === 0) {
@@ -594,7 +641,7 @@ async function loadResultsTable(page = 1) {
 
     tbody.innerHTML = items
       .map((tx) => {
-        const isFlagged = tx.classification === "FLAGGED";
+        const isFlagged = tx.classification === "FLAGGED" || tx.risk_score >= 0.7372;
         const scorePct = Math.min(100, Math.round(tx.risk_score * 100));
 
         let groundTruthBadge = `<span class="mono" style="color: var(--text-muted); font-size: 11px;">Unlabeled</span>`;
@@ -602,6 +649,16 @@ async function loadResultsTable(page = 1) {
           groundTruthBadge = `<span class="risk-badge flagged" title="IBM AML Dataset Verified Label">LAUNDERING (1)</span>`;
         } else if (tx.ground_truth === 0) {
           groundTruthBadge = `<span class="risk-badge normal">CLEAN (0)</span>`;
+        }
+
+        // FraudLens Card 3 Risk Level Badge
+        let riskBadge;
+        if (tx.risk_level_code === "high" || tx.risk_score >= 0.7372) {
+          riskBadge = `<span class="risk-badge high">High (${Number(tx.risk_score).toFixed(2)})</span>`;
+        } else if (tx.risk_level_code === "medium" || tx.risk_score >= 0.40) {
+          riskBadge = `<span class="risk-badge medium">Medium (${Number(tx.risk_score).toFixed(2)})</span>`;
+        } else {
+          riskBadge = `<span class="risk-badge low">Low (${Number(tx.risk_score).toFixed(2)})</span>`;
         }
 
         return `
@@ -617,11 +674,7 @@ async function loadResultsTable(page = 1) {
               <span class="score-num ${isFlagged ? "text-danger" : ""}">${Number(tx.risk_score).toFixed(4)}</span>
             </div>
           </td>
-          <td>
-            <span class="risk-badge ${isFlagged ? "flagged" : "normal"}">
-              ${isFlagged ? "FLAGGED" : "BELOW THRESHOLD"}
-            </span>
-          </td>
+          <td>${riskBadge}</td>
           <td>${groundTruthBadge}</td>
           <td>
             <button class="btn btn-secondary btn-sm" onclick="inspectTransaction('${tx.id}')">Investigate</button>
@@ -652,10 +705,10 @@ window.inspectTransaction = function (txId) {
 };
 
 // ============================================================================
-// 4. CONNECTED ACCOUNTS GRAPH (CANVAS FORCE-DIRECTED)
+// 4. CONNECTED ACCOUNTS GRAPH (CANVAS FORCE-DIRECTED & ANIMATED FLOW)
 // ============================================================================
 
-let canvas, ctx, simulationTimer;
+let canvas, ctx, animFrameId, simulationTimer;
 
 function initGraphCanvas() {
   canvas = document.getElementById("graph-canvas");
@@ -665,6 +718,9 @@ function initGraphCanvas() {
   const scoreSlider = document.getElementById("graph-score-slider");
   const scoreVal = document.getElementById("graph-score-val");
   const resetBtn = document.getElementById("btn-reset-graph");
+  const zoomInBtn = document.getElementById("btn-graph-zoom-in");
+  const zoomOutBtn = document.getElementById("btn-graph-zoom-out");
+  const toggleFlowBtn = document.getElementById("btn-toggle-flow");
 
   if (scoreSlider && scoreVal) {
     scoreSlider.addEventListener("input", () => {
@@ -675,27 +731,140 @@ function initGraphCanvas() {
 
   if (resetBtn) {
     resetBtn.addEventListener("click", () => {
+      state.transform = { x: 0, y: 0, scale: 1 };
       if (scoreSlider) scoreSlider.value = "0";
       if (scoreVal) scoreVal.textContent = "0.00";
       loadGraph(0);
     });
   }
 
-  // Handle canvas clicks
-  canvas.addEventListener("click", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener("click", () => {
+      state.transform.scale = Math.min(3.0, state.transform.scale * 1.25);
+    });
+  }
 
-    // Find clicked node
-    for (const node of state.graphNodes) {
-      const dist = Math.hypot(node.x - x, node.y - y);
-      if (dist <= 15) {
-        state.selectedNode = node;
-        inspectAccount(node.id);
-        drawGraph();
-        return;
-      }
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener("click", () => {
+      state.transform.scale = Math.max(0.4, state.transform.scale * 0.8);
+    });
+  }
+
+  if (toggleFlowBtn) {
+    toggleFlowBtn.addEventListener("click", () => {
+      state.isAnimating = !state.isAnimating;
+      toggleFlowBtn.classList.toggle("active", state.isAnimating);
+      const icon = document.getElementById("flow-btn-icon");
+      const text = document.getElementById("flow-btn-text");
+      if (icon) icon.textContent = state.isAnimating ? "⏸" : "▶";
+      if (text) text.textContent = state.isAnimating ? "Pause Flow" : "Animate Flow";
+    });
+  }
+
+  // Mouse Interactivity: Pan, Drag, Hover, Zoom
+  canvas.addEventListener("mousedown", handleCanvasMouseDown);
+  canvas.addEventListener("mousemove", handleCanvasMouseMove);
+  window.addEventListener("mouseup", handleCanvasMouseUp);
+  canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
+
+  // Animation Loop for Particle Flow and Halo Pulses
+  cancelAnimationFrame(animFrameId);
+  function renderLoop() {
+    drawGraph();
+    animFrameId = requestAnimationFrame(renderLoop);
+  }
+  renderLoop();
+}
+
+function getCanvasMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const screenX = e.clientX - rect.left;
+  const screenY = e.clientY - rect.top;
+  const worldX = (screenX - state.transform.x) / state.transform.scale;
+  const worldY = (screenY - state.transform.y) / state.transform.scale;
+  return { screenX, screenY, worldX, worldY };
+}
+
+function handleCanvasMouseDown(e) {
+  const { screenX, screenY, worldX, worldY } = getCanvasMousePos(e);
+
+  // Check if clicked a node
+  for (let i = state.graphNodes.length - 1; i >= 0; i--) {
+    const node = state.graphNodes[i];
+    const radius = node.is_flagged ? 18 : 14;
+    const dist = Math.hypot(node.x - worldX, node.y - worldY);
+    if (dist <= radius + 6) {
+      state.dragNode = node;
+      state.selectedNode = node;
+      inspectAccount(node.id);
+      return;
+    }
+  }
+
+  // Otherwise start canvas panning
+  state.isPanning = true;
+  state.panStart = { x: screenX - state.transform.x, y: screenY - state.transform.y };
+}
+
+function handleCanvasMouseMove(e) {
+  const { screenX, screenY, worldX, worldY } = getCanvasMousePos(e);
+
+  if (state.dragNode) {
+    state.dragNode.x = worldX;
+    state.dragNode.y = worldY;
+    return;
+  }
+
+  if (state.isPanning) {
+    state.transform.x = screenX - state.panStart.x;
+    state.transform.y = screenY - state.panStart.y;
+    return;
+  }
+
+  // Hover detection for cursor
+  let hovering = false;
+  for (const node of state.graphNodes) {
+    const dist = Math.hypot(node.x - worldX, node.y - worldY);
+    if (dist <= (node.is_flagged ? 18 : 14) + 6) {
+      hovering = true;
+      state.hoveredNode = node;
+      break;
+    }
+  }
+  if (!hovering) state.hoveredNode = null;
+  canvas.style.cursor = hovering ? "pointer" : (state.isPanning ? "grabbing" : "grab");
+}
+
+function handleCanvasMouseUp() {
+  state.dragNode = null;
+  state.isPanning = false;
+}
+
+function handleCanvasWheel(e) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+  const newScale = Math.max(0.4, Math.min(3.0, state.transform.scale * zoomFactor));
+
+  // Zoom centered on cursor position
+  state.transform.x = mouseX - (mouseX - state.transform.x) * (newScale / state.transform.scale);
+  state.transform.y = mouseY - (mouseY - state.transform.y) * (newScale / state.transform.scale);
+  state.transform.scale = newScale;
+}
+
+function initParticles() {
+  state.particles = [];
+  state.graphEdges.forEach((edge, edgeIdx) => {
+    const count = edge.is_flagged || edge.max_risk_score >= 0.7372 ? 4 : 2;
+    for (let i = 0; i < count; i++) {
+      state.particles.push({
+        edgeIdx: edgeIdx,
+        progress: Math.random(),
+        speed: 0.005 + Math.min(0.015, (edge.max_risk_score || 0.2) * 0.012),
+      });
     }
   });
 }
@@ -703,10 +872,9 @@ function initGraphCanvas() {
 async function loadGraph(minScore = 0) {
   if (!canvas) return;
 
-  // Responsive sizing
   const wrapper = canvas.parentElement;
   canvas.width = wrapper.clientWidth || 800;
-  canvas.height = 540;
+  canvas.height = 560;
 
   if (!state.currentSessionId) {
     drawEmptyGraph("No active analysis. Upload transactions to view connected accounts network.");
@@ -726,7 +894,6 @@ async function loadGraph(minScore = 0) {
       return;
     }
 
-    // Initialize layout positions
     const width = canvas.width;
     const height = canvas.height;
     const cx = width / 2;
@@ -745,22 +912,27 @@ async function loadGraph(minScore = 0) {
     });
 
     state.graphEdges = rawEdges;
-
-    // Run short relaxation simulation
+    initParticles();
     runForceSimulation();
+
+    // Auto-select first flagged node or first node if none selected
+    if (!state.selectedNode && state.graphNodes.length > 0) {
+      const topFlagged = state.graphNodes.find((n) => n.is_flagged || n.max_risk_score >= 0.7372) || state.graphNodes[0];
+      state.selectedNode = topFlagged;
+      inspectAccount(topFlagged.id);
+    }
   } catch (err) {
     drawEmptyGraph(`Failed to load graph: ${err.message}`);
   }
 }
 
 function runForceSimulation() {
-  let iterations = 40;
+  let iterations = 45;
   clearInterval(simulationTimer);
 
   simulationTimer = setInterval(() => {
     if (iterations-- <= 0) {
       clearInterval(simulationTimer);
-      drawGraph();
       return;
     }
 
@@ -769,15 +941,15 @@ function runForceSimulation() {
     const cx = width / 2;
     const cy = height / 2;
 
-    // Repulsion
+    // Node-Node Repulsion
     for (let i = 0; i < state.graphNodes.length; i++) {
       for (let j = i + 1; j < state.graphNodes.length; j++) {
         const n1 = state.graphNodes[i];
         const n2 = state.graphNodes[j];
         const dx = n2.x - n1.x;
         const dy = n2.y - n1.y;
-        const dist = Math.max(15, Math.hypot(dx, dy));
-        const force = 400 / (dist * dist);
+        const dist = Math.max(20, Math.hypot(dx, dy));
+        const force = 450 / (dist * dist);
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
         n1.vx -= fx;
@@ -787,7 +959,7 @@ function runForceSimulation() {
       }
     }
 
-    // Edge attraction
+    // Edge Attraction
     const nodeMap = new Map(state.graphNodes.map((n) => [n.id, n]));
     for (const e of state.graphEdges) {
       const n1 = nodeMap.get(e.source);
@@ -796,7 +968,7 @@ function runForceSimulation() {
         const dx = n2.x - n1.x;
         const dy = n2.y - n1.y;
         const dist = Math.max(1, Math.hypot(dx, dy));
-        const force = (dist - 80) * 0.04;
+        const force = (dist - 90) * 0.045;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
         n1.vx += fx;
@@ -806,48 +978,72 @@ function runForceSimulation() {
       }
     }
 
-    // Apply & gravity
+    // Gravity to center & update positions
     for (const n of state.graphNodes) {
+      if (state.dragNode && state.dragNode.id === n.id) continue;
       n.vx += (cx - n.x) * 0.02;
       n.vy += (cy - n.y) * 0.02;
-      n.x += Math.max(-12, Math.min(12, n.vx));
-      n.y += Math.max(-12, Math.min(12, n.vy));
-      n.vx *= 0.6;
-      n.vy *= 0.6;
-      n.x = Math.max(30, Math.min(width - 30, n.x));
-      n.y = Math.max(30, Math.min(height - 30, n.y));
+      n.x += Math.max(-14, Math.min(14, n.vx));
+      n.y += Math.max(-14, Math.min(14, n.vy));
+      n.vx *= 0.65;
+      n.vy *= 0.65;
+      n.x = Math.max(40, Math.min(width - 40, n.x));
+      n.y = Math.max(40, Math.min(height - 40, n.y));
     }
-
-    drawGraph();
   }, 20);
 }
 
 function drawGraph() {
   if (!ctx || !canvas) return;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const width = canvas.width;
+  const height = canvas.height;
+
+  ctx.clearRect(0, 0, width, height);
+
+  if (state.graphNodes.length === 0) {
+    drawEmptyGraph("No accounts match the selected edge score threshold.");
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(state.transform.x, state.transform.y);
+  ctx.scale(state.transform.scale, state.transform.scale);
 
   const nodeMap = new Map(state.graphNodes.map((n) => [n.id, n]));
+  const now = Date.now();
 
-  // Draw Edges
-  for (const e of state.graphEdges) {
+  // 1. Draw Edges
+  state.graphEdges.forEach((e) => {
     const s = nodeMap.get(e.source);
     const t = nodeMap.get(e.target);
-    if (!s || !t) continue;
+    if (!s || !t) return;
 
-    const isFlagged = e.max_risk_score >= 0.7372;
-    ctx.strokeStyle = isFlagged ? "#DC2626" : "rgba(37, 99, 235, 0.35)";
-    ctx.lineWidth = isFlagged ? 2.5 : 1.2;
+    const isFlagged = e.is_flagged || e.max_risk_score >= 0.7372;
+    const isMedium = !isFlagged && e.max_risk_score >= 0.40;
+    const isEdgeSelected = state.selectedNode && (state.selectedNode.id === s.id || state.selectedNode.id === t.id);
 
     ctx.beginPath();
     ctx.moveTo(s.x, s.y);
     ctx.lineTo(t.x, t.y);
+
+    if (isFlagged) {
+      ctx.strokeStyle = isEdgeSelected ? "rgba(220, 38, 38, 0.95)" : "rgba(220, 38, 38, 0.65)";
+      ctx.lineWidth = isEdgeSelected ? 3.5 : 2.5;
+    } else if (isMedium) {
+      ctx.strokeStyle = isEdgeSelected ? "rgba(245, 158, 11, 0.9)" : "rgba(245, 158, 11, 0.5)";
+      ctx.lineWidth = isEdgeSelected ? 2.5 : 1.8;
+    } else {
+      ctx.strokeStyle = isEdgeSelected ? "rgba(37, 99, 235, 0.8)" : "rgba(148, 163, 184, 0.35)";
+      ctx.lineWidth = isEdgeSelected ? 2.0 : 1.2;
+    }
     ctx.stroke();
 
     // Directional Arrow Head
     const angle = Math.atan2(t.y - s.y, t.x - s.x);
-    const arrowDist = 18;
-    const ax = t.x - Math.cos(angle) * arrowDist;
-    const ay = t.y - Math.sin(angle) * arrowDist;
+    const radius = t.is_flagged || t.max_risk_score >= 0.7372 ? 18 : 14;
+    const ax = t.x - Math.cos(angle) * (radius + 3);
+    const ay = t.y - Math.sin(angle) * (radius + 3);
 
     ctx.fillStyle = ctx.strokeStyle;
     ctx.beginPath();
@@ -856,28 +1052,78 @@ function drawGraph() {
     ctx.lineTo(ax - 7 * Math.cos(angle + Math.PI / 6), ay - 7 * Math.sin(angle + Math.PI / 6));
     ctx.closePath();
     ctx.fill();
+  });
+
+  // 2. Animate Money Flow Particles
+  if (state.isAnimating && state.particles.length > 0) {
+    state.particles.forEach((p) => {
+      const edge = state.graphEdges[p.edgeIdx];
+      if (!edge) return;
+      const s = nodeMap.get(edge.source);
+      const t = nodeMap.get(edge.target);
+      if (!s || !t) return;
+
+      p.progress += p.speed;
+      if (p.progress > 1) p.progress = 0;
+
+      const px = s.x + (t.x - s.x) * p.progress;
+      const py = s.y + (t.y - s.y) * p.progress;
+
+      const isFlagged = edge.is_flagged || edge.max_risk_score >= 0.7372;
+
+      ctx.beginPath();
+      ctx.arc(px, py, isFlagged ? 4.0 : 3.0, 0, Math.PI * 2);
+      ctx.fillStyle = isFlagged ? "#EF4444" : "#38BDF8";
+      ctx.shadowColor = isFlagged ? "#DC2626" : "#0284C7";
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
   }
 
-  // Draw Nodes
-  for (const n of state.graphNodes) {
+  // 3. Draw Nodes
+  state.graphNodes.forEach((n) => {
     const isSelected = state.selectedNode && state.selectedNode.id === n.id;
-    const isFlagged = n.is_flagged;
+    const isHovered = state.hoveredNode && state.hoveredNode.id === n.id;
+    const isFlagged = n.is_flagged || n.max_risk_score >= 0.7372;
+    const isMedium = !isFlagged && n.max_risk_score >= 0.40;
+    const radius = isFlagged ? 18 : (isMedium ? 15 : 13);
 
+    // Pulsing Halo Glow for High-Risk and Medium-Risk Nodes
+    if (isFlagged) {
+      const pulse = Math.sin(now / 220) * 4;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, radius + 5 + pulse, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(220, 38, 38, 0.22)";
+      ctx.fill();
+    } else if (isMedium) {
+      const pulse = Math.sin(now / 300) * 2.5;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, radius + 3 + pulse, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(245, 158, 11, 0.18)";
+      ctx.fill();
+    }
+
+    // Node Core Circle
     ctx.beginPath();
-    ctx.arc(n.x, n.y, isSelected ? 12 : 9, 0, 2 * Math.PI);
-    ctx.fillStyle = isFlagged ? "#DC2626" : "#2563EB";
+    ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = isFlagged ? "#DC2626" : (isMedium ? "#F59E0B" : "#2563EB");
     ctx.fill();
 
-    ctx.strokeStyle = isSelected ? "#0F172A" : "#FFFFFF";
-    ctx.lineWidth = isSelected ? 3 : 2;
+    // Node Stroke / Selection
+    ctx.strokeStyle = isSelected ? "#0F172A" : (isHovered ? "#38BDF8" : "#FFFFFF");
+    ctx.lineWidth = isSelected ? 3.5 : (isHovered ? 2.5 : 2);
     ctx.stroke();
 
-    // Label
-    ctx.font = "10px Inter, sans-serif";
+    // Node Label
+    ctx.font = isSelected ? "bold 11px Inter, sans-serif" : "10px Inter, sans-serif";
     ctx.fillStyle = "#0F172A";
     ctx.textAlign = "center";
-    ctx.fillText(n.id, n.x, n.y + 20);
-  }
+    ctx.textBaseline = "top";
+    ctx.fillText(n.id, n.x, n.y + radius + 5);
+  });
+
+  ctx.restore();
 }
 
 function drawEmptyGraph(msg) {
@@ -889,69 +1135,196 @@ function drawEmptyGraph(msg) {
   ctx.fillText(msg, canvas.width / 2, canvas.height / 2);
 }
 
+// Sidepanel Subtab switcher
+window.switchSidepanelTab = function (tabName) {
+  state.activeSidepanelTab = tabName;
+  document.querySelectorAll("#sidepanel-tabs .subnav-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.id === `btn-sidetab-${tabName}`);
+  });
+  renderSidepanelContent();
+};
+
+window.filterTableByAccount = function (accountId) {
+  state.resultsSearch = accountId;
+  const searchInput = document.getElementById("table-search-input");
+  if (searchInput) searchInput.value = accountId;
+  switchTab("view-results");
+};
+
 async function inspectAccount(accountId) {
   const title = document.getElementById("panel-entity-title");
+  const badge = document.getElementById("panel-entity-badge");
   const content = document.getElementById("panel-entity-content");
+  const subtabs = document.getElementById("sidepanel-tabs");
   if (!title || !content) return;
 
   title.textContent = `Account: ${accountId}`;
-  content.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px;">Loading account history...</div>`;
+  content.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">Loading account history...</div>`;
 
   try {
     const res = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/account/${encodeURIComponent(accountId)}`);
     if (!res.ok) throw new Error("Account query failed");
     const acc = await res.json();
+    state.activeAccountData = acc;
+
+    if (subtabs) subtabs.style.display = "flex";
+    if (badge) {
+      const code = acc.risk_level_code || "low";
+      badge.innerHTML = `<span class="risk-badge ${code}">${acc.risk_level} (${acc.max_risk_score.toFixed(2)})</span>`;
+    }
+
+    renderSidepanelContent();
+  } catch (err) {
+    content.innerHTML = `<div style="color: var(--color-flagged); font-size: 12px; padding: 12px;">Failed to inspect account: ${err.message}</div>`;
+  }
+}
+
+function renderSidepanelContent() {
+  const content = document.getElementById("panel-entity-content");
+  const acc = state.activeAccountData;
+  if (!content || !acc) return;
+
+  const tab = state.activeSidepanelTab || "reason";
+
+  if (tab === "reason") {
+    // TAB 1: Plain-English Layman Reason & Risk Factors Breakdown
+    const factorsHtml = (acc.risk_factors || [])
+      .map(
+        (f) => `
+      <div class="risk-factor-card">
+        <div class="risk-factor-header">
+          <span class="risk-factor-title">${f.title}</span>
+          <span class="impact-tag ${f.level}">${f.impact}</span>
+        </div>
+        <div class="risk-factor-desc">${f.description}</div>
+      </div>
+    `
+      )
+      .join("");
 
     content.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
-        <div style="background: var(--bg-card-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-card);">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-            <span style="color: var(--text-muted); font-size: 11px;">ACTIVITY SUMMARY</span>
-            <span class="risk-badge ${acc.flagged_transactions > 0 ? "flagged" : "normal"}">${acc.flagged_transactions} Flagged</span>
+      <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+        <!-- Layman Callout Banner -->
+        <div class="layman-callout ${acc.risk_level_code || "low"}">
+          <div class="layman-callout-title">
+            ${
+              acc.risk_level_code === "high"
+                ? "🚨 High-Risk Account Flag"
+                : acc.risk_level_code === "medium"
+                ? "⚠️ Elevated Risk Notice"
+                : "✅ Normal Account Baseline"
+            }
           </div>
-          <div><strong>Total Transactions:</strong> ${acc.total_transactions}</div>
-          <div><strong>Total Volume Sent:</strong> $${Number(acc.total_sent).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-          <div><strong>Total Volume Received:</strong> $${Number(acc.total_received).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div>${acc.plain_english_summary}</div>
         </div>
 
+        <!-- Key Risk Factors -->
         <div>
-          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">CONNECTED COUNTERPARTIES (${acc.counterparties.length})</div>
-          <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-            ${acc.counterparties.map((c) => `<span class="session-pill mono">${c}</span>`).join("")}
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.3px;">RISK FACTOR BREAKDOWN</div>
+          ${factorsHtml}
+        </div>
+
+        <!-- Account Metrics Grid -->
+        <div style="background: var(--bg-card-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-card); margin-top: 4px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">ACCOUNT OVERVIEW</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+            <div><span style="color: var(--text-muted);">Total Txs:</span> <strong>${acc.total_transactions}</strong></div>
+            <div><span style="color: var(--text-muted);">Flagged Txs:</span> <strong class="${acc.flagged_transactions > 0 ? "text-danger" : ""}">${acc.flagged_transactions}</strong></div>
+            <div><span style="color: var(--text-muted);">Total Sent:</span> <strong class="mono">$${Number(acc.total_sent).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: var(--text-muted);">Total Received:</span> <strong class="mono">$${Number(acc.total_received).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></div>
+            <div><span style="color: var(--text-muted);">Unique Counterparties:</span> <strong>${acc.counterparties.length}</strong></div>
+            <div><span style="color: var(--text-muted);">Peak Score:</span> <strong class="mono ${acc.risk_level_code === "high" ? "text-danger" : ""}">${acc.max_risk_score.toFixed(4)}</strong></div>
           </div>
         </div>
 
+        <button class="btn btn-primary btn-sm" onclick="filterTableByAccount('${acc.account_id}')" style="width: 100%; margin-top: 4px;">
+          Filter Detection Results by This Account &rarr;
+        </button>
+      </div>
+    `;
+  } else if (tab === "txs") {
+    // TAB 2: Transaction History
+    const txRows = (acc.transactions || [])
+      .map(
+        (t) => `
+      <div style="padding: 10px; border: 1px solid var(--border-subtle); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; background: #FFFFFF;">
         <div>
-          <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">TRANSACTION LOG</div>
-          <div style="display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto;">
-            ${acc.transactions
-              .map(
-                (t) => `
-              <div style="padding: 8px; border: 1px solid var(--border-subtle); border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
-                <div>
-                  <div class="mono" style="font-weight: 600;">${t.id} &bull; $${Number(t.amount).toLocaleString()}</div>
-                  <div style="font-size: 10px; color: var(--text-muted);">${t.from_account === accountId ? `To &rarr; ${t.to_account}` : `From &larr; ${t.from_account}`}</div>
-                </div>
-                <div style="text-align: right;">
-                  <span class="mono ${t.classification === "FLAGGED" ? "text-danger" : ""}" style="font-weight: 600;">${Number(t.risk_score).toFixed(4)}</span>
-                  <div><button class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px;" onclick="inspectTransaction('${t.id}')">View</button></div>
-                </div>
-              </div>
-            `
-              )
-              .join("")}
+          <div class="mono" style="font-weight: 600;">${t.id} &bull; $${Number(t.amount).toLocaleString()}</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            ${t.from_account === acc.account_id ? `To &rarr; <span class="mono">${t.to_account}</span>` : `From &larr; <span class="mono">${t.from_account}</span>`}
           </div>
+          <div style="font-size: 10px; color: var(--text-muted);">${t.timestamp_str || formatTimestamp(t.timestamp)}</div>
+        </div>
+        <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+          <span class="risk-badge ${t.classification === "FLAGGED" ? "high" : "low"}" style="font-size: 10px;">${Number(t.risk_score).toFixed(2)}</span>
+          <button class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 10px;" onclick="inspectTransaction('${t.id}')">Investigate</button>
+        </div>
+      </div>
+    `
+      )
+      .join("");
+
+    content.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted);">TRANSACTION LEDGER (${acc.transactions.length})</div>
+        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 480px; overflow-y: auto;">
+          ${txRows}
         </div>
       </div>
     `;
-  } catch (err) {
-    content.innerHTML = `<div style="color: var(--color-flagged); font-size: 12px;">Failed to inspect account: ${err.message}</div>`;
+  } else if (tab === "counterparties") {
+    // TAB 3: Counterparties
+    const cpDetails = acc.counterparties_details || [];
+    const cpRows = cpDetails
+      .map(
+        (cp) => `
+      <div style="padding: 10px; border: 1px solid var(--border-subtle); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; background: #FFFFFF;">
+        <div>
+          <div class="mono" style="font-weight: 700; color: var(--accent-blue);">${cp.account_id}</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            ${cp.transaction_count} transaction(s) &bull; $${Number(cp.total_amount).toLocaleString()}
+          </div>
+        </div>
+        <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+          <span class="risk-badge ${cp.risk_level_code}">${cp.risk_level} (${cp.max_risk_score.toFixed(2)})</span>
+          <button class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 10px;" onclick="inspectAccount('${cp.account_id}')">Inspect</button>
+        </div>
+      </div>
+    `
+      )
+      .join("");
+
+    content.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted);">CONNECTED COUNTERPARTIES (${cpDetails.length})</div>
+        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 480px; overflow-y: auto;">
+          ${cpRows}
+        </div>
+      </div>
+    `;
   }
 }
 
 // ============================================================================
-// 5. TRANSACTION EXPLANATION & ATTENTION
+// 5. TRANSACTION EXPLANATION & ATTENTION (FRAUDLENS CARD 5 STYLE)
 // ============================================================================
+
+window.switchExpTab = function (tabName) {
+  state.activeExpTab = tabName;
+  document.querySelectorAll("#view-explanation .subnav-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.id === `btn-exptab-${tabName}`);
+  });
+
+  const tabFactors = document.getElementById("tab-content-factors");
+  const tabRelated = document.getElementById("tab-content-related");
+  const tabBehavior = document.getElementById("tab-content-behavior");
+  const tabModel = document.getElementById("tab-content-model");
+
+  if (tabFactors) tabFactors.style.display = tabName === "factors" ? "block" : "none";
+  if (tabRelated) tabRelated.style.display = tabName === "related" ? "block" : "none";
+  if (tabBehavior) tabBehavior.style.display = tabName === "behavior" ? "block" : "none";
+  if (tabModel) tabModel.style.display = tabName === "model" ? "block" : "none";
+};
 
 async function loadTransactionExplanation(txId) {
   const expTxId = document.getElementById("exp-tx-id");
@@ -960,6 +1333,15 @@ async function loadTransactionExplanation(txId) {
   const expReceiver = document.getElementById("exp-tx-receiver");
   const expAmount = document.getElementById("exp-tx-amount");
   const expScore = document.getElementById("exp-tx-score");
+  const expBadge = document.getElementById("exp-tx-badge");
+  const expDecision = document.getElementById("exp-tx-decision");
+  const expCallout = document.getElementById("exp-layman-callout");
+  const expCalloutTitle = document.getElementById("exp-layman-title");
+  const expCalloutText = document.getElementById("exp-layman-text");
+
+  const factorsContainer = document.getElementById("exp-factors-container");
+  const relatedContainer = document.getElementById("exp-related-container");
+  const behaviorContainer = document.getElementById("exp-behavior-container");
   const attnBody = document.getElementById("exp-attention-body");
   const evBody = document.getElementById("exp-evidence-body");
 
@@ -967,17 +1349,130 @@ async function loadTransactionExplanation(txId) {
     const res = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/transaction/${encodeURIComponent(txId)}`);
     if (!res.ok) throw new Error("Transaction fetch error");
     const tx = await res.json();
+    state.activeTransactionData = tx;
 
-    // Populate Header
+    const isFlagged = tx.classification === "FLAGGED" || tx.risk_score >= (tx.threshold || 0.7372);
+    const scoreVal = Number(tx.risk_score);
+
+    // Populate Header Card (FraudLens Card 5)
     expTxId.textContent = tx.id;
     expTime.textContent = tx.timestamp_str || formatTimestamp(tx.timestamp);
     expSender.textContent = tx.from_account;
     expReceiver.textContent = tx.to_account;
     expAmount.textContent = `$${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    expScore.textContent = Number(tx.risk_score).toFixed(4);
-    expScore.style.color = tx.classification === "FLAGGED" ? "var(--color-flagged)" : "var(--text-primary)";
 
-    // Section A: Model Attribution
+    expScore.textContent = scoreVal.toFixed(4);
+    expScore.style.color = isFlagged ? "var(--color-flagged)" : "var(--text-primary)";
+
+    if (expBadge) {
+      expBadge.className = `risk-badge ${tx.risk_level_code || (isFlagged ? "high" : "low")}`;
+      expBadge.textContent = tx.risk_level || (isFlagged ? "High Risk" : "Low Risk");
+    }
+
+    if (expDecision) {
+      expDecision.innerHTML = isFlagged
+        ? `<strong style="color: var(--color-flagged);">Suspicious (Flagged)</strong>`
+        : `<strong style="color: var(--color-success);">Cleared (Normal)</strong>`;
+    }
+
+    // Layman Callout Banner
+    if (expCallout && expCalloutText) {
+      expCallout.style.display = "flex";
+      expCallout.className = `layman-callout ${tx.risk_level_code || (isFlagged ? "high" : "low")}`;
+      if (expCalloutTitle) {
+        expCalloutTitle.innerHTML = isFlagged
+          ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Why Was This Transaction Flagged?`
+          : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Why Is This Transaction Low Risk?`;
+      }
+      expCalloutText.textContent = tx.plain_english_summary || tx.explainability?.summary;
+    }
+
+    // TAB 1: Key Risk Factors Breakdown (FraudLens Card 5)
+    if (factorsContainer) {
+      const factors = tx.plain_english_factors || [];
+      if (factors.length === 0) {
+        factorsContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 13px;">No explicit risk factors recorded.</div>`;
+      } else {
+        factorsContainer.innerHTML = factors
+          .map(
+            (f) => `
+          <div class="risk-factor-card">
+            <div class="risk-factor-header">
+              <span class="risk-factor-title">${f.title}</span>
+              <span class="impact-tag ${f.level}">${f.impact}</span>
+            </div>
+            <div class="risk-factor-desc">${f.description}</div>
+          </div>
+        `
+          )
+          .join("");
+      }
+    }
+
+    // TAB 2: Related Transactions in Batch
+    if (relatedContainer) {
+      // Find other transactions involving sender or receiver
+      try {
+        const relatedRes = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/results?search=${encodeURIComponent(tx.from_account)}&limit=10`);
+        const relatedData = await relatedRes.json();
+        const relatedTxs = (relatedData.items || []).filter((t) => t.id !== tx.id);
+
+        if (relatedTxs.length === 0) {
+          relatedContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">No other transactions involving these counterparties were found in this batch.</div>`;
+        } else {
+          relatedContainer.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">CONCURRENT TRANSACTIONS INVOLVING ${tx.from_account} (${relatedTxs.length})</div>
+              ${relatedTxs
+                .map(
+                  (t) => `
+                <div style="padding: 10px; border: 1px solid var(--border-subtle); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; background: #FFFFFF;">
+                  <div>
+                    <div class="mono" style="font-weight: 600;">${t.id} &bull; $${Number(t.amount).toLocaleString()}</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                      From <span class="mono">${t.from_account}</span> &rarr; To <span class="mono">${t.to_account}</span>
+                    </div>
+                  </div>
+                  <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                    <span class="risk-badge ${t.classification === "FLAGGED" ? "high" : "low"}">${Number(t.risk_score).toFixed(2)}</span>
+                    <button class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 10px;" onclick="inspectTransaction('${t.id}')">Inspect</button>
+                  </div>
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          `;
+        }
+      } catch (err) {
+        relatedContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 12px;">Could not load related transactions.</div>`;
+      }
+    }
+
+    // TAB 3: Account Behavior Summary
+    if (behaviorContainer) {
+      behaviorContainer.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+          <div style="background: var(--bg-card-subtle); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-card);">
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">SENDER PROFILE</div>
+            <div class="mono" style="font-size: 16px; font-weight: 700; color: var(--accent-blue); margin-bottom: 8px;">${tx.from_account}</div>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('view-investigation'); inspectAccount('${tx.from_account}')" style="width: 100%;">
+              Open Account in Network Graph &rarr;
+            </button>
+          </div>
+
+          <div style="background: var(--bg-card-subtle); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-card);">
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">RECEIVER PROFILE</div>
+            <div class="mono" style="font-size: 16px; font-weight: 700; color: var(--accent-blue); margin-bottom: 8px;">${tx.to_account}</div>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('view-investigation'); inspectAccount('${tx.to_account}')" style="width: 100%;">
+              Open Account in Network Graph &rarr;
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // TAB 4: TGAT Model Attention (Layer 1 & 2 Attention Weights)
     if (!tx.has_history) {
       attnBody.innerHTML = `
         <div style="padding: 16px; background: var(--color-warning-bg); border: 1px solid var(--color-warning-border); border-radius: var(--radius-sm); font-size: 13px; color: #92400E;">
@@ -986,8 +1481,8 @@ async function loadTransactionExplanation(txId) {
         </div>
       `;
     } else {
-      const senderNeighbors = tx.sender_attention.neighbors || [];
-      const receiverNeighbors = tx.receiver_attention.neighbors || [];
+      const senderNeighbors = tx.sender_attention?.neighbors || [];
+      const receiverNeighbors = tx.receiver_attention?.neighbors || [];
 
       attnBody.innerHTML = `
         <div class="attention-grid">
@@ -1047,12 +1542,12 @@ async function loadTransactionExplanation(txId) {
       `;
     }
 
-    // Section B: Empirical Evidence
-    const evidenceList = tx.explainability.evidence || [];
+    // Factual Evidence list in Tab 4
+    const evidenceList = tx.explainability?.evidence || [];
     evBody.innerHTML = `
       <div style="margin-bottom: 12px;">
         <div style="font-size: 12px; font-weight: 600; color: var(--text-muted);">SUMMARY ATTRIBUTION:</div>
-        <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-top: 2px;">${tx.explainability.summary}</div>
+        <div style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-top: 2px;">${tx.explainability?.summary || "N/A"}</div>
       </div>
       <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">FACTUAL TRANSACTION CONTEXT:</div>
       <div class="evidence-list">
@@ -1062,8 +1557,11 @@ async function loadTransactionExplanation(txId) {
         Note: Empirical attributes are factual behavioral markers extracted from chronological transaction logs, provided strictly as investigator context.
       </div>
     `;
+
+    // Make sure first tab is active
+    switchExpTab("factors");
   } catch (err) {
-    attnBody.innerHTML = `<div style="color: var(--color-flagged); font-size: 12px;">Failed to load explanation: ${err.message}</div>`;
+    if (attnBody) attnBody.innerHTML = `<div style="color: var(--color-flagged); font-size: 12px;">Failed to load explanation: ${err.message}</div>`;
   }
 }
 

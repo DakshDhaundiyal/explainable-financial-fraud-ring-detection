@@ -122,6 +122,17 @@
 
           <!-- Active Analysis Content (Hidden initially until analysis loaded) -->
           <div id="overview-active-content" style="display: none;">
+            <!-- Executive Summary Callout (Layman Explanation) -->
+            <div class="layman-callout high" id="overview-exec-callout" style="display: none; padding: 14px 18px; margin-bottom: var(--space-5);">
+              <div class="layman-callout-title" style="font-size: 14px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                Executive Fraud Risk Summary
+              </div>
+              <div id="overview-exec-text" style="font-size: 13px; line-height: 1.5; color: inherit; font-weight: 500;">
+                Analyzing batch transactions...
+              </div>
+            </div>
+
             <!-- Real KPI Grid -->
             <div class="kpi-grid">
               <div class="kpi-card">
@@ -144,20 +155,20 @@
 
               <div class="kpi-card">
                 <div class="kpi-header">
+                  <span class="kpi-label">High-Risk Accounts</span>
+                  <span class="kpi-badge danger" id="kpi-accounts-badge">Involved</span>
+                </div>
+                <div class="kpi-value text-danger" id="kpi-high-risk-accounts">0</div>
+                <div class="kpi-subtext">Senders & receivers above cutoff</div>
+              </div>
+
+              <div class="kpi-card">
+                <div class="kpi-header">
                   <span class="kpi-label">Flagged Alert Rate</span>
                   <span class="kpi-badge danger" id="kpi-rate-badge">0.0%</span>
                 </div>
                 <div class="kpi-value" id="kpi-flag-rate">0.0%</div>
                 <div class="kpi-subtext" id="kpi-flag-rate-denom">Denominator: 0 transactions</div>
-              </div>
-
-              <div class="kpi-card">
-                <div class="kpi-header">
-                  <span class="kpi-label">Distinct Accounts</span>
-                  <span class="kpi-badge neutral">Active Nodes</span>
-                </div>
-                <div class="kpi-value" id="kpi-distinct-accounts">0</div>
-                <div class="kpi-subtext">Unique senders and receivers</div>
               </div>
             </div>
 
@@ -410,10 +421,34 @@
             </div>
           </div>
 
+          <!-- Summary Pills Bar (FraudLens Style) -->
+          <div class="summary-pills-bar">
+            <div class="summary-pill-card">
+              <span class="summary-pill-label">TOTAL TRANSACTIONS</span>
+              <span class="summary-pill-val" id="pill-total-count">0</span>
+            </div>
+            <div class="summary-pill-card">
+              <span class="summary-pill-label">FLAGGED TRANSACTIONS</span>
+              <span class="summary-pill-val text-danger" id="pill-flagged-count">0</span>
+            </div>
+            <div class="summary-pill-card">
+              <span class="summary-pill-label">HIGH RISK (&ge;0.74)</span>
+              <span class="summary-pill-val text-danger" id="pill-high-count">0</span>
+            </div>
+            <div class="summary-pill-card">
+              <span class="summary-pill-label">MEDIUM RISK (0.40–0.74)</span>
+              <span class="summary-pill-val" style="color: #D97706;" id="pill-med-count">0</span>
+            </div>
+            <div class="summary-pill-card">
+              <span class="summary-pill-label">LOW RISK (&lt;0.40)</span>
+              <span class="summary-pill-val text-success" id="pill-low-count">0</span>
+            </div>
+          </div>
+
           <!-- Threshold Banner -->
           <div style="padding: 10px 16px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius-sm); margin-bottom: var(--space-4); display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
             <div>
-              <strong>Operating Decision Threshold: <span class="mono">0.7372</span></strong> (Validation-Tuned Max F1). Transactions with risk score &ge; 0.7372 are flagged.
+              <strong>Operating Decision Threshold: <span class="mono">0.7372</span></strong> (Validation-Tuned Max F1). High-risk transactions scoring &ge; 0.7372 are flagged.
             </div>
             <div class="mono" style="font-size: 11px; color: var(--text-muted);" id="results-count-summary">
               Showing 0 transactions
@@ -428,11 +463,12 @@
                 <input type="text" class="search-input" id="table-search-input" placeholder="Search account or transaction ID...">
               </div>
 
-              <div style="display: flex; gap: var(--space-2); align-items: center;">
-                <select class="filter-select" id="table-flag-filter">
-                  <option value="">All Transactions</option>
-                  <option value="flagged">Flagged Only (&ge; 0.7372)</option>
-                  <option value="normal">Below Threshold</option>
+              <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+                <select class="filter-select" id="table-risk-level-filter">
+                  <option value="">All Risk Levels</option>
+                  <option value="high">High Risk (&ge; 0.7372)</option>
+                  <option value="medium">Medium Risk (0.40–0.74)</option>
+                  <option value="low">Low Risk (&lt; 0.40)</option>
                 </select>
 
                 <select class="filter-select" id="table-sort-filter">
@@ -487,7 +523,7 @@
           <div class="page-header">
             <div>
               <h2 class="page-title">Connected Accounts & Topology Investigation</h2>
-              <p class="page-subtitle">Interactive transaction network. Nodes represent accounts; directed edges indicate transaction flow.</p>
+              <p class="page-subtitle">Interactive transaction network. Animated flow particles represent fund movements; glowing nodes indicate risk levels.</p>
             </div>
             <div class="page-actions">
               <button class="btn btn-secondary btn-sm" id="btn-reset-graph">Reset Graph View</button>
@@ -498,14 +534,32 @@
             <!-- Canvas Graph -->
             <div class="graph-canvas-wrapper">
               <div class="canvas-toolbar">
-                <div style="display: flex; gap: var(--space-3); align-items: center;">
-                  <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Min Edge Score:</span>
-                  <input type="range" id="graph-score-slider" min="0" max="1" step="0.05" value="0" style="width: 120px;">
-                  <span class="mono" id="graph-score-val" style="font-size: 12px;">0.00</span>
+                <div class="canvas-controls-group">
+                  <button class="canvas-btn" id="btn-graph-zoom-in" title="Zoom In">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    Zoom +
+                  </button>
+                  <button class="canvas-btn" id="btn-graph-zoom-out" title="Zoom Out">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    Zoom &minus;
+                  </button>
+                  <button class="canvas-btn active" id="btn-toggle-flow" title="Toggle Animated Money Flow Particles">
+                    <span id="flow-btn-icon">⏸</span>
+                    <span id="flow-btn-text">Pause Flow</span>
+                  </button>
                 </div>
-                <div style="font-size: 11px; color: var(--text-muted);">
-                  <span style="display: inline-block; width: 8px; height: 8px; background: #DC2626; border-radius: 50%; margin-right: 4px;"></span>Flagged Entity
-                  <span style="display: inline-block; width: 8px; height: 8px; background: #2563EB; border-radius: 50%; margin-left: 12px; margin-right: 4px;"></span>Account Node
+
+                <div style="display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;">
+                  <div style="display: flex; gap: var(--space-2); align-items: center;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Min Edge Score:</span>
+                    <input type="range" id="graph-score-slider" min="0" max="1" step="0.05" value="0" style="width: 100px;">
+                    <span class="mono" id="graph-score-val" style="font-size: 11px;">0.00</span>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                    <span><span style="display: inline-block; width: 8px; height: 8px; background: #DC2626; border-radius: 50%; margin-right: 3px;"></span>High Risk (&ge;0.74)</span>
+                    <span><span style="display: inline-block; width: 8px; height: 8px; background: #F59E0B; border-radius: 50%; margin-right: 3px;"></span>Medium (0.40–0.74)</span>
+                    <span><span style="display: inline-block; width: 8px; height: 8px; background: #2563EB; border-radius: 50%; margin-right: 3px;"></span>Low Risk (&lt;0.40)</span>
+                  </div>
                 </div>
               </div>
               <canvas id="graph-canvas"></canvas>
@@ -513,12 +567,22 @@
 
             <!-- Entity Side Detail Panel -->
             <div class="investigation-sidepanel" id="investigation-sidepanel">
-              <div class="card-header" style="padding: 0 0 var(--space-3); border-bottom: 1px solid var(--border-subtle);">
-                <h4 class="card-title" id="panel-entity-title">Entity Details</h4>
+              <div class="card-header" style="padding: 0 0 var(--space-3); border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+                <h4 class="card-title" id="panel-entity-title">Account Details</h4>
+                <span id="panel-entity-badge"></span>
               </div>
+
+              <!-- Sidepanel Subtabs -->
+              <div class="subnav-tabs" id="sidepanel-tabs" style="display: none; margin-bottom: var(--space-3);">
+                <button class="subnav-btn active" id="btn-sidetab-reason" onclick="switchSidepanelTab('reason')">Risk Breakdown</button>
+                <button class="subnav-btn" id="btn-sidetab-txs" onclick="switchSidepanelTab('txs')">Transactions</button>
+                <button class="subnav-btn" id="btn-sidetab-counterparties" onclick="switchSidepanelTab('counterparties')">Counterparties</button>
+              </div>
+
               <div id="panel-entity-content">
-                <div style="font-size: 13px; color: var(--text-muted); text-align: center; padding: var(--space-6) 0;">
-                  Click any node (account) or edge (transaction) on the graph to inspect topology, funds moved, and historical counterparts.
+                <div style="font-size: 13px; color: var(--text-muted); text-align: center; padding: var(--space-8) 0;">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-disabled); margin-bottom: 8px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <div>Select any node on the graph to investigate why that account is high-risk or safe, its transactions, and connected ring counterparties.</div>
                 </div>
               </div>
             </div>
@@ -532,68 +596,105 @@
         <section class="tab-view" id="view-explanation">
           <div class="page-header">
             <div>
-              <h2 class="page-title">Transaction Explanation & Model Evidence</h2>
-              <p class="page-subtitle">Deconstruct neural attention weights (&alpha;<sub>ij</sub>) and factual empirical indicators.</p>
+              <h2 class="page-title">Transaction Explanation — Why Was It Flagged?</h2>
+              <p class="page-subtitle">Understand plain-English risk drivers, related counterparty patterns, and technical TGAT attention weights.</p>
             </div>
             <div class="page-actions">
               <button class="btn btn-secondary btn-sm" id="btn-back-to-results-from-exp">&larr; Back to Results</button>
             </div>
           </div>
 
-          <!-- Transaction Summary Header -->
-          <div class="card" style="margin-bottom: var(--space-5);">
+          <!-- Transaction Summary Header (FraudLens Card 5 Style) -->
+          <div class="card" style="margin-bottom: var(--space-4);">
             <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-4);">
-              <div>
-                <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">INSPECTED TRANSACTION</div>
-                <div class="mono" id="exp-tx-id" style="font-size: 18px; font-weight: 700; color: var(--text-primary);">Select a transaction</div>
-                <div style="font-size: 12px; color: var(--text-muted);" id="exp-tx-time">—</div>
-              </div>
-              <div style="display: flex; gap: var(--space-6);">
+              <div style="display: flex; gap: var(--space-6); flex-wrap: wrap; align-items: center;">
                 <div>
-                  <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">SENDER ACCOUNT</div>
+                  <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TRANSACTION ID</div>
+                  <div class="mono" id="exp-tx-id" style="font-size: 18px; font-weight: 700; color: var(--text-primary);">Select a transaction</div>
+                  <div style="font-size: 12px; color: var(--text-muted);" id="exp-tx-time">—</div>
+                </div>
+                <div>
+                  <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">FROM ACCOUNT</div>
                   <div class="mono" id="exp-tx-sender" style="font-size: 14px; font-weight: 600;">—</div>
                 </div>
                 <div>
-                  <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">RECEIVER ACCOUNT</div>
+                  <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TO ACCOUNT</div>
                   <div class="mono" id="exp-tx-receiver" style="font-size: 14px; font-weight: 600;">—</div>
                 </div>
                 <div>
-                  <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">AMOUNT</div>
-                  <div class="mono" id="exp-tx-amount" style="font-size: 15px; font-weight: 700; color: var(--text-primary);">$0.00</div>
+                  <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TRANSACTION AMOUNT</div>
+                  <div class="mono" id="exp-tx-amount" style="font-size: 16px; font-weight: 700; color: var(--text-primary);">$0.00</div>
                 </div>
-                <div>
-                  <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">RISK SCORE</div>
-                  <div class="mono" id="exp-tx-score" style="font-size: 18px; font-weight: 700;">0.0000</div>
+              </div>
+
+              <!-- Risk Score Summary Box -->
+              <div id="exp-score-box" style="background: #F8FAFC; border: 1px solid var(--border-card); border-radius: var(--radius-md); padding: 12px 18px; min-width: 200px; display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 11px; font-weight: 600; color: var(--text-muted);">RISK SCORE</span>
+                  <span class="risk-badge low" id="exp-tx-badge">Low Risk</span>
+                </div>
+                <div class="mono" id="exp-tx-score" style="font-size: 26px; font-weight: 800; color: var(--text-primary); line-height: 1;">0.0000</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="exp-tx-thresh-note">
+                  Threshold: <strong>0.7372</strong> &bull; <span id="exp-tx-decision">Cleared</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Two Section Layout -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
-            <!-- Section A: Model Attribution -->
-            <div class="card" style="margin-bottom: 0;">
-              <div class="card-header">
-                <div>
-                  <h3 class="card-title">A. Model Attribution (TGAT Dynamic Attention)</h3>
-                  <p class="card-subtitle">Layer-wise attention distribution (&alpha;<sub>ij</sub>) over strictly past counterparties.</p>
-                </div>
-              </div>
-              <div class="card-body" id="exp-attention-body">
-                <div style="color: var(--text-muted); font-size: 13px;">Select a transaction from Detection Results to inspect attention weights.</div>
-              </div>
+          <!-- Plain-English Layman Banner -->
+          <div class="layman-callout high" id="exp-layman-callout" style="display: none;">
+            <div class="layman-callout-title" id="exp-layman-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Plain-English Risk Explanation
+            </div>
+            <div id="exp-layman-text" style="font-size: 13px; font-weight: 500;">
+              Select a transaction to inspect risk factors.
+            </div>
+          </div>
+
+          <!-- Sub-Navigation Tabs (FraudLens Card 5) -->
+          <div class="card">
+            <div class="subnav-tabs" style="margin-bottom: 0; background: #FFFFFF; border-bottom: 1px solid var(--border-subtle); padding: 6px 12px 0;">
+              <button class="subnav-btn active" id="btn-exptab-factors" onclick="switchExpTab('factors')">Key Risk Factors</button>
+              <button class="subnav-btn" id="btn-exptab-related" onclick="switchExpTab('related')">Related Transactions</button>
+              <button class="subnav-btn" id="btn-exptab-behavior" onclick="switchExpTab('behavior')">Account Behaviour</button>
+              <button class="subnav-btn" id="btn-exptab-model" onclick="switchExpTab('model')">TGAT Model Attention Insights</button>
             </div>
 
-            <!-- Section B: Empirical Evidence -->
-            <div class="card" style="margin-bottom: 0;">
-              <div class="card-header">
-                <div>
-                  <h3 class="card-title">B. Empirical Investigative Evidence</h3>
-                  <p class="card-subtitle">Factual behavioral attributes provided as context (independent of model weights).</p>
+            <div class="card-body" style="padding: var(--space-5);">
+              <!-- TAB 1: Key Risk Factors (Plain English) -->
+              <div id="tab-content-factors">
+                <div id="exp-factors-container">
+                  <div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">
+                    Select a transaction from Detection Results to inspect risk factors.
+                  </div>
                 </div>
               </div>
-              <div class="card-body" id="exp-evidence-body">
-                <div style="color: var(--text-muted); font-size: 13px;">Select a transaction from Detection Results to inspect evidence points.</div>
+
+              <!-- TAB 2: Related Transactions -->
+              <div id="tab-content-related" style="display: none;">
+                <div id="exp-related-container">
+                  <div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">
+                    No related transactions found.
+                  </div>
+                </div>
+              </div>
+
+              <!-- TAB 3: Account Behavior -->
+              <div id="tab-content-behavior" style="display: none;">
+                <div id="exp-behavior-container">
+                  <!-- Populated dynamically -->
+                </div>
+              </div>
+
+              <!-- TAB 4: Model Attention Weights -->
+              <div id="tab-content-model" style="display: none;">
+                <div id="exp-attention-body">
+                  <div style="color: var(--text-muted); font-size: 13px;">Select a transaction from Detection Results to inspect attention weights.</div>
+                </div>
+                <div style="margin-top: var(--space-4); border-top: 1px solid var(--border-subtle); padding-top: var(--space-4);" id="exp-evidence-body">
+                  <!-- Evidence points -->
+                </div>
               </div>
             </div>
           </div>
