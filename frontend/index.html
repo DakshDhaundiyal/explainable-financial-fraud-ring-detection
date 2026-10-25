@@ -3,503 +3,394 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TGAT Fraud Ring Investigator — Explainable Financial Crime Detection</title>
+  <title>Fraud Ring Defender — Explainable TGAT Financial Fraud Detection</title>
   <meta name="description" content="Explainable Temporal Graph Attention Network (TGAT) for Financial Fraud Ring Detection on IBM AML Benchmark.">
+  <meta name="application-name" content="FRAUD RING DEFENDER">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-shell">
-    
-    <!-- SIDEBAR NAVIGATION -->
-    <aside class="app-sidebar" id="app-sidebar">
-      <div class="sidebar-header">
-        <div class="brand-badge">
-          <div class="brand-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <div>
-            <h1 class="brand-title">TGAT FRAUD RING DEFENDER</h1>
-            <span class="brand-subtitle">Temporal Graph AI</span>
-          </div>
+  <!-- TOP BAR NAVIGATION -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-group">
+        <div class="brand-icon">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="7" r="2.5"></circle>
+            <circle cx="18" cy="7" r="2.5"></circle>
+            <circle cx="12" cy="18" r="2.5"></circle>
+            <path d="M8.5 7h7M7.4 9.2l3.6 6.6M16.6 9.2l-3.6 6.6"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">Fraud Ring Defender</span>
+          <span class="brand-subtitle">Temporal Graph AI (TGAT)</span>
         </div>
       </div>
 
-      <!-- 2 Clean Navigation Tabs -->
-      <nav class="sidebar-nav" role="tablist">
-        <button class="nav-item-btn active" id="nav-btn-detector" data-target="view-detector" role="tab" aria-selected="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
-          TGAT Fraud Detection
-        </button>
-        <button class="nav-item-btn" id="nav-btn-comparison" data-target="view-comparison" role="tab" aria-selected="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          Results with Other Models
-        </button>
+      <nav class="top-nav" aria-label="Main Navigation">
+        <button type="button" class="tab-btn active" id="tab-detect-btn" data-target="tab-detect-content" aria-selected="true">Detect</button>
+        <button type="button" class="tab-btn" id="tab-compare-btn" data-target="tab-compare-content" aria-selected="false">Compare models</button>
       </nav>
 
-      <!-- Sidebar Status Footer -->
-      <div class="sidebar-footer">
-        <div class="system-status-card">
-          <div class="status-indicator">
-            <span class="status-dot"></span>
-            <span>MODEL LOCKED</span>
+      <div class="header-status">
+        <span class="status-dot"></span>
+        <span>Model ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="main-container">
+
+    <!-- ================================================================ -->
+    <!-- TAB 1: DETECT -->
+    <!-- ================================================================ -->
+    <div class="tab-content active" id="tab-detect-content" role="tabpanel">
+
+      <!-- STATE A: BEFORE RUN (FRONT PAGE) -->
+      <div id="detect-state-a">
+        <div style="max-width: 760px;">
+          <h1 class="page-title">Find hidden fraud rings in your transactions</h1>
+          <p class="page-subtitle">A fraud ring is a group of accounts that pass money around to hide where it came from. Add your data or try the demo, and see which accounts look suspicious and why.</p>
+        </div>
+
+        <div class="action-cards-grid">
+          <!-- Upload Card -->
+          <section class="action-card">
+            <div class="action-card-header">
+              <div class="action-card-icon">
+                <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 16V4M12 4l-4 4M12 4l4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"></path>
+                </svg>
+              </div>
+              <h2 class="action-card-title">Upload your file</h2>
+            </div>
+            <div class="dropzone-box" id="dropzone-box">
+              <span class="dropzone-text">Drop a CSV file here</span>
+              <span style="font-size: 14px; color: var(--text-muted);">or</span>
+              <button type="button" class="btn btn-secondary" id="btn-choose-file">Choose file</button>
+              <input type="file" id="file-input-csv" accept=".csv" style="display: none;">
+            </div>
+            <p style="margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.5;">Your file needs the sender, receiver, amount and time of each transaction.</p>
+          </section>
+
+            <!-- Demo Card -->
+            <section class="action-card demo-theme">
+              <div class="action-card-header">
+                <div class="action-card-icon">
+                  <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 4.5v15l12-7.5z"></path>
+                  </svg>
+                </div>
+                <h2 class="action-card-title">Try the demo</h2>
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px;">
+                <p style="margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em;" id="demo-title-text">Sample transactions</p>
+                <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #3B4C66;">Taken from the IBM anti-money-laundering benchmark. No file needed.</p>
+                <div class="demo-size-selector">
+                  <button type="button" class="btn-demo-size" id="demo-size-50" data-size="50">50 transactions (fast)</button>
+                  <button type="button" class="btn-demo-size active" id="demo-size-1000" data-size="1000">1,000+ accounts (with fraud ring)</button>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary" id="btn-run-demo" style="min-height: 48px; padding: 0 28px; font-size: 16px;">
+                  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M7 4.5v15l12-7.5z"></path></svg>
+                  <span id="run-demo-text">Run demo (1,000+ accounts)</span>
+                </button>
+                <span style="font-size: 14px; color: #3B4C66;" id="demo-time-hint">Takes ~1.5 seconds.</span>
+              </div>
+            </section>
+        </div>
+
+        <!-- How It Works 3-Step Strip -->
+        <div class="how-it-works-section">
+          <h2 class="section-label">How it works</h2>
+          <div class="steps-grid">
+            <div class="step-card">
+              <span class="step-number">1</span>
+              <div>
+                <div class="step-title">Add transactions</div>
+                <div class="step-desc">Upload a CSV, or use the demo batch.</div>
+              </div>
+            </div>
+            <div class="step-card">
+              <span class="step-number">2</span>
+              <div>
+                <div class="step-title">The AI checks every account</div>
+                <div class="step-desc">It looks at who pays whom, and when.</div>
+              </div>
+            </div>
+            <div class="step-card">
+              <span class="step-number">3</span>
+              <div>
+                <div class="step-title">Read the result</div>
+                <div class="step-desc">See who looks risky, with a plain-English reason.</div>
+              </div>
+            </div>
           </div>
-          <span class="checkpoint-text" title="Canonical TGAT Checkpoint">results/tgat/model.pt</span>
         </div>
       </div>
-    </aside>
 
-    <!-- MAIN APP CONTAINER -->
-    <main class="app-main">
+      <!-- STATE B: AFTER A RUN (REPLACES THE CARDS) -->
+      <div id="detect-state-b" style="display: none;">
 
-      <!-- TOP HEADER -->
-      <header class="app-top-header">
-        <div class="top-header-left">
-          <div class="active-analysis-badge">
-            <span>Session:</span>
-            <span class="session-pill" id="header-session-id">Ready</span>
+        <!-- 1. Source Row -->
+        <div class="source-row">
+          <div class="source-meta">
+            <span class="source-pill" id="source-batch-pill">Demo batch</span>
+            <span style="font-size: 15px; color: var(--text-secondary);" id="source-tx-count">50 transactions</span>
+            <span style="font-size: 15px; color: #8A97AB;" aria-hidden="true">·</span>
+            <span class="mono" style="font-size: 13px; color: var(--text-secondary);" id="source-session-id">ANL-SESSION</span>
+          </div>
+          <div class="source-actions">
+            <button type="button" class="btn btn-secondary" id="btn-upload-new">Upload a new file</button>
+            <button type="button" class="btn btn-secondary" id="btn-run-again">Run demo again</button>
           </div>
         </div>
 
-        <div class="top-header-right">
-          <div class="threshold-badge" title="Operating Decision Threshold (Optimal &tau;* on validation split)">
-            <span>Threshold:</span>
-            <span class="threshold-val" id="header-threshold-val">0.7372</span>
+        <!-- 2. Verdict Banner -->
+        <section class="verdict-banner clear" id="verdict-banner">
+          <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 2px;" id="verdict-icon">
+            <circle cx="12" cy="12" r="10"></circle><path d="M7.5 12.5l3 3 6-6.5"></path>
+          </svg>
+          <div>
+            <h1 class="verdict-title" id="verdict-title">All clear: no fraud rings found</h1>
+            <p class="verdict-desc" id="verdict-desc">All 50 transactions scored below the alert line of 0.74, so the money movement looks normal.</p>
           </div>
-          <button class="btn btn-primary btn-sm" id="btn-header-demo">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Quick 50-Tx Demo
-          </button>
+        </section>
+
+        <!-- 3. Four Metric Tiles -->
+        <section class="tiles-grid">
+          <div class="metric-tile">
+            <div class="tile-label">Transactions checked</div>
+            <div class="tile-number" id="tile-total-txs">50</div>
+            <div class="tile-subtext" id="tile-checked-duration">Checked in 0.58 seconds</div>
+          </div>
+          <div class="metric-tile">
+            <div class="tile-label">Flagged as risky</div>
+            <div class="tile-number" id="tile-flagged-txs">0</div>
+            <div class="tile-subtext" id="tile-flagged-pct">0% of this batch</div>
+          </div>
+          <div class="metric-tile">
+            <div class="tile-label">Look normal</div>
+            <div class="tile-number" id="tile-normal-txs">50</div>
+            <div class="tile-subtext">No action needed</div>
+          </div>
+          <div class="metric-tile">
+            <div class="tile-label">Fewer false alarms</div>
+            <div class="tile-number accent" id="tile-fp-reduction">83.8%</div>
+            <div class="tile-subtext">than XGBoost</div>
+          </div>
+        </section>
+
+        <!-- 4. Two Columns: Graph (Left) & Selected Account (Right) -->
+        <div class="investigation-grid">
+
+          <!-- Left Column: Graph -->
+          <section class="graph-column">
+            <div class="card-header-flex">
+              <div>
+                <h2 class="card-title">Who sent money to whom</h2>
+                <p class="card-subtitle">Click an account to see why it got its score.</p>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-secondary" id="btn-pause-flow" style="min-height: 44px; padding: 0 14px;">
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="pause-icon"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>
+                  <span id="pause-text">Pause flow</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btn-reset-view" style="min-height: 44px; padding: 0 14px;">Reset view</button>
+              </div>
+            </div>
+
+            <!-- Graph Risk Score Filter Slider -->
+            <div class="graph-filter-container">
+              <div class="graph-filter-header">
+                <div class="filter-label-group">
+                  <span class="filter-title">Filter graph by risk</span>
+                  <span class="filter-count-badge" id="graph-filter-badge">Showing all accounts</span>
+                </div>
+                <div class="filter-presets">
+                  <button type="button" class="btn-filter-chip active" id="chip-filter-all" data-value="0">All</button>
+                  <button type="button" class="btn-filter-chip" id="chip-filter-watch" data-value="0.40">Watch (≥ 0.40)</button>
+                  <button type="button" class="btn-filter-chip alert" id="chip-filter-alert" data-value="0.74">Alert line (≥ 0.74)</button>
+                </div>
+              </div>
+              <div class="slider-row">
+                <span class="slider-limit">0.00</span>
+                <div class="slider-track-wrap">
+                  <input type="range" id="graph-risk-slider" min="0" max="1" step="0.01" value="0" aria-label="Filter graph accounts by minimum risk score" />
+                  <div class="slider-alert-mark" id="slider-alert-mark" style="left: 73.72%;" title="Alert line (0.74)"></div>
+                </div>
+                <span class="slider-limit">1.00</span>
+                <span class="slider-value-pill" id="slider-value-pill">≥ 0.00</span>
+              </div>
+            </div>
+
+            <div class="graph-viewport-box">
+              <canvas id="graph-canvas" aria-label="Network of accounts and money moving between them."></canvas>
+            </div>
+
+            <div class="graph-legend-strip">
+              <span class="legend-item"><span class="legend-swatch normal"></span>Normal</span>
+              <span class="legend-item"><span class="legend-swatch watch"></span>Needs watching</span>
+              <span class="legend-item"><span class="legend-swatch risk"></span><span id="legend-risk-text">High risk (none found)</span></span>
+              <span class="legend-item"><span class="legend-swatch dot"></span>Moving dot = money flowing</span>
+            </div>
+          </section>
+
+          <!-- Right Column: Selected Account -->
+          <section class="account-column">
+            <div class="card-header-flex">
+              <div>
+                <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);">Selected account</div>
+                <h2 class="mono" style="margin: 4px 0 0; font-size: 22px; font-weight: 600;" id="account-selected-id">--</h2>
+              </div>
+              <span class="status-pill normal" id="account-status-pill">Normal</span>
+            </div>
+
+            <!-- Score meter -->
+            <div class="score-meter-wrap">
+              <div class="score-meter-header">
+                <span style="font-size: 14px; color: var(--text-secondary);">Risk score</span>
+                <span style="font-size: 20px; font-weight: 700;" id="account-score-num">0.00 <span style="font-size: 13px; font-weight: 500; color: var(--text-muted);">out of 1</span></span>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill normal" id="account-meter-fill" style="width: 0%;"></div>
+                <div class="meter-alert-line" id="meter-alert-line" style="left: 73.72%;"></div>
+              </div>
+              <div class="meter-scale">
+                <span style="position: absolute; left: 0;">0 · Safe</span>
+                <span class="alert-label" id="meter-alert-label" style="left: 73.72%;">Alert line 0.74</span>
+                <span style="position: absolute; right: 0;">1</span>
+              </div>
+            </div>
+
+            <!-- Subtabs: Why / Transactions / Connections -->
+            <div class="sidepanel-tabs" role="tablist" aria-label="Account details">
+              <button type="button" class="subtab-btn active" id="subtab-why" role="tab" aria-selected="true">Why</button>
+              <button type="button" class="subtab-btn" id="subtab-txs" role="tab" aria-selected="false">Transactions</button>
+              <button type="button" class="subtab-btn" id="subtab-connections" role="tab" aria-selected="false">Connections</button>
+            </div>
+
+            <!-- Tab Panel: Why -->
+            <div id="panel-why">
+              <div class="why-callout normal" id="why-callout-box">
+                <div class="callout-title" id="why-callout-title">Looks normal</div>
+                <p class="callout-desc" id="why-callout-desc">This account moves money in a typical pattern. No action is needed.</p>
+              </div>
+
+              <h3 style="margin: 22px 0 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);">What affected the score</h3>
+              <div style="display: flex; flex-direction: column; gap: 10px;" id="drivers-container">
+                <!-- Top 3 drivers populated dynamically -->
+              </div>
+
+              <div class="facts-grid">
+                <div class="fact-box">
+                  <div class="fact-label">Transactions</div>
+                  <div class="fact-val" id="fact-transactions">0</div>
+                </div>
+                <div class="fact-box">
+                  <div class="fact-label">Linked accounts</div>
+                  <div class="fact-val" id="fact-linked">0</div>
+                </div>
+                <div class="fact-box">
+                  <div class="fact-label">Money in</div>
+                  <div class="fact-val mono" id="fact-money-in">$0.00</div>
+                </div>
+                <div class="fact-box">
+                  <div class="fact-label">Money out</div>
+                  <div class="fact-val mono" id="fact-money-out">$0.00</div>
+                </div>
+              </div>
+
+              <button type="button" class="btn btn-secondary" id="btn-see-account-txs" style="margin-top: 18px; width: 100%; min-height: 46px;">See all transactions for this account</button>
+            </div>
+
+            <!-- Tab Panel: Transactions -->
+            <div id="panel-txs" style="display: none; margin-top: 18px;">
+              <div style="display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto;" id="account-tx-ledger">
+                <!-- Rows populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Tab Panel: Connections -->
+            <div id="panel-connections" style="display: none; margin-top: 18px;">
+              <div style="display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto;" id="account-connections-list">
+                <!-- Connected counterparties populated dynamically -->
+              </div>
+            </div>
+
+          </section>
+
         </div>
-      </header>
-
-      <!-- VIEW CONTAINER -->
-      <div class="view-container">
-
-        <!-- ================================================================ -->
-        <!-- TAB 1: TGAT FRAUD DETECTION (FRONT PAGE) -->
-        <!-- ================================================================ -->
-        <section class="tab-view active" id="view-detector" role="tabpanel">
-
-          <!-- TOP ACTION HERO: Upload CSV or Instant Demo -->
-          <div class="hero-action-card">
-            <div style="margin-bottom: var(--space-4);">
-              <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
-                Detect Financial Fraud Rings with Temporal Graph AI
-              </h2>
-              <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
-                Upload a transaction batch or run the instant demo to discover money laundering rings, rapid pass-throughs, and circular funds.
-              </p>
-            </div>
-
-            <div class="quick-action-split">
-              <!-- Left: Upload CSV -->
-              <div class="quick-action-box" id="dropzone-box">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  <strong style="font-size: 14px; color: var(--text-primary);">Upload Transactions CSV</strong>
-                </div>
-                <p style="font-size: 12px; color: var(--text-muted);">
-                  Drop your CSV file here or click to browse.
-                </p>
-                <div style="margin-top: auto; display: flex; align-items: center; gap: 8px;">
-                  <input type="file" id="file-input-csv" accept=".csv" style="display: none;">
-                  <button class="btn btn-secondary btn-sm" id="btn-browse-file" style="width: 100%;">
-                    Select CSV File
-                  </button>
-                </div>
-              </div>
-
-              <!-- Right: Instant Demo -->
-              <div class="quick-action-box" style="border-color: rgba(59, 130, 246, 0.4); background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, var(--bg-card-subtle) 100%);">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                  <strong style="font-size: 14px; color: var(--text-primary);">Instant 50-Tx Demo Batch</strong>
-                </div>
-                <p style="font-size: 12px; color: var(--text-muted);">
-                  Includes 50 IBM AML benchmark transactions with known money laundering rings.
-                </p>
-                <div style="margin-top: auto;">
-                  <button class="btn btn-primary btn-sm" id="btn-run-demo" style="width: 100%;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    Run 50-Tx Demo Batch
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Scoring Progress Bar -->
-            <div class="scoring-progress-card" id="scoring-progress" style="display: none;">
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
-                <span id="scoring-progress-text" style="color: var(--text-primary); font-weight: 600;">Analyzing transaction graph with Temporal Attention...</span>
-                <span id="scoring-progress-pct" class="mono" style="color: var(--accent-blue); font-weight: 700;">45%</span>
-              </div>
-              <div class="progress-bar-track">
-                <div class="progress-bar-fill" id="scoring-progress-bar" style="width: 45%;"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- RESULTS CONTAINER (Populated when analysis is loaded) -->
-          <div id="detector-results-container" style="display: none; margin-top: var(--space-6);">
-
-            <!-- Plain-English Executive Summary Banner -->
-            <div class="layman-callout high" id="detector-exec-banner" style="margin-bottom: var(--space-5);">
-              <div class="layman-callout-title" id="detector-exec-title">
-                ⚠️ Suspicious Money Laundering Detected
-              </div>
-              <div id="detector-exec-text" style="font-size: 13px; line-height: 1.5;">
-                TGAT flagged suspicious transactions with high confidence. The accounts exhibit rapid pass-through structuring and cycling funds across counterparties.
-              </div>
-            </div>
-
-            <!-- 4 Clean Key Metrics -->
-            <div class="kpi-grid" style="margin-bottom: var(--space-6);">
-              <div class="kpi-card">
-                <span class="kpi-label">Total Analyzed</span>
-                <span class="kpi-value" id="kpi-total-txs">50</span>
-                <span class="kpi-subtext" id="kpi-duration">Inference: 0.12s</span>
-              </div>
-              <div class="kpi-card" style="border-left: 3px solid var(--color-flagged);">
-                <span class="kpi-label">Flagged High-Risk</span>
-                <span class="kpi-value text-danger" id="kpi-flagged-txs">6</span>
-                <span class="kpi-subtext" id="kpi-flagged-rate">12.0% of batch</span>
-              </div>
-              <div class="kpi-card" style="border-left: 3px solid var(--color-success);">
-                <span class="kpi-label">Cleared / Normal</span>
-                <span class="kpi-value" id="kpi-cleared-txs">44</span>
-                <span class="kpi-subtext">Verified legitimate</span>
-              </div>
-              <div class="kpi-card" style="border-left: 3px solid var(--accent-blue);">
-                <span class="kpi-label">False Alarm Prevention</span>
-                <span class="kpi-value" style="color: var(--accent-blue);">83.8%</span>
-                <span class="kpi-subtext">Fewer false alerts than XGBoost</span>
-              </div>
-            </div>
-
-            <!-- NETWORK TOPOLOGY GRAPH & ACCOUNT EXPLANATION SIDE-BY-SIDE -->
-            <div class="investigation-layout" style="margin-bottom: var(--space-6);">
-              <!-- Animated Graph Area -->
-              <div class="graph-viewport-card" style="position: relative;">
-                <div class="graph-controls-bar">
-                  <div class="graph-controls-left">
-                    <span style="font-weight: 600; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M8.5 7.5L15.5 16.5M15.5 7.5L8.5 16.5"/></svg>
-                      Money Flow Topology
-                    </span>
-                    <span style="font-size: 11px; color: var(--text-muted);">(Click node to inspect)</span>
-                  </div>
-                  <div class="graph-controls-right">
-                    <button class="btn btn-secondary btn-sm active" id="btn-toggle-flow" title="Pause or Resume Money Flow Particles">
-                      <span id="flow-btn-icon">⏸</span>
-                      <span id="flow-btn-text">Flow Active</span>
-                    </button>
-                    <button class="btn btn-secondary btn-sm" id="btn-graph-zoom-in" title="Zoom In">+</button>
-                    <button class="btn btn-secondary btn-sm" id="btn-graph-zoom-out" title="Zoom Out">&minus;</button>
-                    <button class="btn btn-secondary btn-sm" id="btn-reset-graph" title="Reset Center">Reset</button>
-                  </div>
-                </div>
-
-                <div class="canvas-wrapper" style="height: 520px; position: relative;">
-                  <canvas id="graph-canvas"></canvas>
-                </div>
-
-                <!-- Legend Bar -->
-                <div class="graph-legend-bar">
-                  <div class="legend-item">
-                    <span class="legend-dot flagged"></span>
-                    <span>High Risk Account</span>
-                  </div>
-                  <div class="legend-item">
-                    <span class="legend-dot medium"></span>
-                    <span>Elevated Risk</span>
-                  </div>
-                  <div class="legend-item">
-                    <span class="legend-dot normal"></span>
-                    <span>Normal / Safe</span>
-                  </div>
-                  <div class="legend-item">
-                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #F43F5E; box-shadow: 0 0 6px #F43F5E;"></span>
-                    <span>Animated Money Bead</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Plain-English Account Explanation Sidepanel -->
-              <div class="entity-sidepanel" id="detector-account-panel">
-                <div class="sidepanel-header">
-                  <div class="sidepanel-title-group">
-                    <h3 class="sidepanel-title" id="panel-entity-title">Select an Account</h3>
-                    <div id="panel-entity-badge">
-                      <span class="risk-badge low">No selection</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Subtabs for Account Investigation -->
-                <div class="subnav-tabs" id="sidepanel-tabs" style="margin-bottom: 12px; display: none;">
-                  <button class="subnav-btn active" id="btn-sidetab-reason" onclick="switchSidepanelTab('reason')">Plain-English Why</button>
-                  <button class="subnav-btn" id="btn-sidetab-txs" onclick="switchSidepanelTab('txs')">Transactions</button>
-                  <button class="subnav-btn" id="btn-sidetab-counterparties" onclick="switchSidepanelTab('counterparties')">Counterparties</button>
-                </div>
-
-                <div class="sidepanel-body" id="panel-entity-content">
-                  <div style="text-align: center; color: var(--text-muted); padding: 48px 16px;">
-                    <p style="font-size: 13px;">Click on any account in the network graph to view its plain-English risk explanation and flow behavior.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- TRANSACTION RESULTS TABLE -->
-            <div class="data-table-card">
-              <div class="table-card-header">
-                <div>
-                  <h3 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">
-                    Transaction Results &amp; Predictions
-                  </h3>
-                  <p style="font-size: 12px; color: var(--text-muted);">
-                    Click <strong>Explain</strong> on any transaction to see why it was flagged or cleared.
-                  </p>
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <input type="text" id="table-search-input" class="search-input" placeholder="Search Account or Tx ID..." style="min-width: 220px;">
-                  <select id="table-filter-risk" class="filter-select">
-                    <option value="">All Transactions</option>
-                    <option value="FLAGGED">High Risk Only (&ge; 0.7372)</option>
-                    <option value="NORMAL">Cleared / Normal (&lt; 0.7372)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="table-responsive">
-                <table class="data-table" id="transactions-table">
-                  <thead>
-                    <tr>
-                      <th>Tx ID</th>
-                      <th>Timestamp</th>
-                      <th>From Account</th>
-                      <th>To Account</th>
-                      <th style="text-align: right;">Amount ($)</th>
-                      <th style="text-align: right;">Risk Score</th>
-                      <th>Decision</th>
-                      <th style="text-align: center;">Explanation</th>
-                    </tr>
-                  </thead>
-                  <tbody id="transactions-tbody">
-                    <tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);">Loading transactions...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- Pagination Footer -->
-              <div class="table-pagination-bar">
-                <span class="pagination-info" id="table-pagination-info">Showing 1 to 25 of 50</span>
-                <div class="pagination-buttons">
-                  <button class="btn btn-secondary btn-sm" id="btn-page-prev" disabled>&larr; Previous</button>
-                  <button class="btn btn-secondary btn-sm" id="btn-page-next">Next &rarr;</button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Transaction Plain-English Explanation Modal -->
-          <div class="tx-modal-backdrop" id="tx-modal" style="display: none;">
-            <div class="tx-modal-card">
-              <div style="padding: var(--space-4); border-bottom: 1px solid var(--border-card); display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <h3 style="font-size: 16px; font-weight: 700; color: var(--text-primary);" id="modal-tx-title">Transaction Explanation</h3>
-                  <span id="modal-tx-badge" class="risk-badge high">High Risk</span>
-                </div>
-                <button class="btn btn-secondary btn-sm" id="btn-close-tx-modal" style="padding: 4px 10px; font-weight: 700;">&times;</button>
-              </div>
-
-              <div style="padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4);">
-                <!-- Callout Banner -->
-                <div class="layman-callout high" id="modal-tx-callout">
-                  <div class="layman-callout-title" id="modal-tx-callout-title">Why was this payment flagged?</div>
-                  <div id="modal-tx-callout-text" style="font-size: 13px; line-height: 1.5;">Explanation loading...</div>
-                </div>
-
-                <!-- Transaction Summary Table -->
-                <div style="background: var(--bg-card-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-card);">
-                  <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">PAYMENT DETAILS</div>
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-                    <div><span style="color: var(--text-muted);">Amount:</span> <strong id="modal-tx-amount" class="mono">$0.00</strong></div>
-                    <div><span style="color: var(--text-muted);">TGAT Risk Score:</span> <strong id="modal-tx-score" class="mono text-danger">0.00</strong></div>
-                    <div><span style="color: var(--text-muted);">From Account:</span> <strong id="modal-tx-from" class="mono">--</strong></div>
-                    <div><span style="color: var(--text-muted);">To Account:</span> <strong id="modal-tx-to" class="mono">--</strong></div>
-                    <div><span style="color: var(--text-muted);">Timestamp:</span> <span id="modal-tx-time" class="mono">--</span></div>
-                    <div><span style="color: var(--text-muted);">Threshold:</span> <span class="mono">0.7372</span></div>
-                  </div>
-                </div>
-
-                <!-- Direct Plain-English Risk Drivers -->
-                <div>
-                  <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">KEY RISK DRIVERS (STRAIGHT TO THE POINT)</div>
-                  <div id="modal-tx-factors" style="display: flex; flex-direction: column; gap: 8px;">
-                    <!-- Populated dynamically -->
-                  </div>
-                </div>
-
-                <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-                  <button class="btn btn-secondary btn-sm" id="btn-close-modal-footer">Close Explanation</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </section>
-
-
-        <!-- ================================================================ -->
-        <!-- TAB 2: RESULTS WITH OTHER MODELS (COMPARISON) -->
-        <!-- ================================================================ -->
-        <section class="tab-view" id="view-comparison" role="tabpanel">
-
-          <div style="margin-bottom: var(--space-6);">
-            <h2 style="font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
-              Model Comparison: Why TGAT Solves Financial Fraud Rings
-            </h2>
-            <p style="font-size: 13px; color: var(--text-muted); max-width: 900px; line-height: 1.5;">
-              Empirical benchmark evaluation on 3.2 Million transactions from the IBM AML Dataset. See why traditional tabular models and static graph AI fail when money is laundered across time and networks.
-            </p>
-          </div>
-
-          <!-- 3 Plain-English Comparison Cards -->
-          <div class="model-breakdown-grid">
-            
-            <!-- Card 1: Tabular XGBoost -->
-            <div class="model-breakdown-card xgboost">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 11px; font-weight: 700; color: #F59E0B; text-transform: uppercase; letter-spacing: 0.5px;">Standard Tabular ML</span>
-                <span class="risk-badge medium">Blind to Networks</span>
-              </div>
-              <h3 style="font-size: 17px; font-weight: 700; color: var(--text-primary);">Tabular XGBoost</h3>
-              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-                Examines each transaction by itself in isolation. If 5 money-mules split $50,000 into smaller amounts and hop them across accounts, XGBoost sees each transfer as a normal small payment and completely misses the laundering ring.
-              </p>
-              <div style="background: var(--bg-card-subtle); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-card); margin-top: auto; font-size: 12px;">
-                <div style="color: var(--text-muted); margin-bottom: 2px;">Analyst Alert Fatigue:</div>
-                <strong style="color: #F59E0B; font-size: 14px;">26,399 False Positives</strong>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Overwhelms fraud teams with false alarms.</div>
-              </div>
-            </div>
-
-            <!-- Card 2: Static GCN -->
-            <div class="model-breakdown-card gcn">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 11px; font-weight: 700; color: #F43F5E; text-transform: uppercase; letter-spacing: 0.5px;">Static Graph AI</span>
-                <span class="risk-badge high">Blind to Time (Failed)</span>
-              </div>
-              <h3 style="font-size: 17px; font-weight: 700; color: var(--text-primary);">Static Graph GCN</h3>
-              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-                Knows who sent money to whom, but has zero concept of time. Collapsing time smears historical transactions with future ones, confusing innocent monthly rent payments with an aggressive 5-minute money-washing funnel.
-              </p>
-              <div style="background: var(--bg-card-subtle); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-card); margin-top: auto; font-size: 12px;">
-                <div style="color: var(--text-muted); margin-bottom: 2px;">Detection Accuracy:</div>
-                <strong style="color: #F43F5E; font-size: 14px;">0.6064 ROC-AUC (Near Random)</strong>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Fails because temporal order is erased.</div>
-              </div>
-            </div>
-
-            <!-- Card 3: TGAT (Ours) -->
-            <div class="model-breakdown-card tgat">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 11px; font-weight: 700; color: var(--accent-blue); text-transform: uppercase; letter-spacing: 0.5px;">Temporal Graph AI</span>
-                <span class="risk-badge" style="background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.4);">Best: Tracks Time + Network</span>
-              </div>
-              <h3 style="font-size: 17px; font-weight: 700; color: var(--text-primary);">TGAT (Our Model)</h3>
-              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-                Learns dynamic attention over time. It tracks both the network topology and the exact speed at which funds move—catching rapid pass-throughs and circular laundering rings while slashing false alarm fatigue.
-              </p>
-              <div style="background: var(--bg-card-subtle); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-card); margin-top: auto; font-size: 12px;">
-                <div style="color: var(--text-muted); margin-bottom: 2px;">Alert Reduction:</div>
-                <strong style="color: var(--color-success); font-size: 14px;">83.8% Fewer False Alarms (Only 357)</strong>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">ROC-AUC: 0.9022 | Precision: Highest</div>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Head-to-Head Benchmark Table -->
-          <div class="data-table-card" style="margin-bottom: var(--space-6);">
-            <div class="table-card-header">
-              <div>
-                <h3 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">
-                  Official IBM AML Benchmark Comparison (Frozen Test Split)
-                </h3>
-                <p style="font-size: 12px; color: var(--text-muted);">
-                  Evaluated on 3,200,000 test transactions under class imbalance ratio of 1:1,000.
-                </p>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Model Architecture</th>
-                    <th>ROC-AUC</th>
-                    <th>PR-AUC</th>
-                    <th>F1 Score</th>
-                    <th>False Alarm Rate</th>
-                    <th>Total False Positives</th>
-                    <th>Explainability Method</th>
-                  </tr>
-                </thead>
-                <tbody id="perf-baselines-tbody">
-                  <!-- Populated from /api/metrics -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Architectural Ablations Table -->
-          <div class="data-table-card">
-            <div class="table-card-header">
-              <div>
-                <h3 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">
-                  Why Each Component Matters (TGAT Architectural Ablation Study)
-                </h3>
-                <p style="font-size: 12px; color: var(--text-muted);">
-                  Empirical experiments isolating harmonic time encoding, temporal neighbors (K), and attention depth.
-                </p>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Experiment ID</th>
-                    <th>Variant Description</th>
-                    <th>Val ROC-AUC</th>
-                    <th>Test ROC-AUC</th>
-                    <th>PR-AUC</th>
-                    <th>F1 Score</th>
-                    <th>P@100</th>
-                    <th>Train Time</th>
-                  </tr>
-                </thead>
-                <tbody id="perf-ablations-tbody">
-                  <!-- Populated from /api/ablations -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </section>
-
       </div>
-    </main>
-  </div>
+
+    </div>
+
+
+    <!-- ================================================================ -->
+    <!-- TAB 2: COMPARE MODELS -->
+    <!-- ================================================================ -->
+    <div class="tab-content" id="tab-compare-content" role="tabpanel">
+
+      <div style="max-width: 760px;">
+        <h1 class="page-title" style="font-size: 34px;">How TGAT compares with other models</h1>
+        <p class="page-subtitle">Every model is tested on the same data. Here is how well each one finds fraud, and how many false alarms it causes.</p>
+      </div>
+
+      <!-- Big Number Highlight Banner -->
+      <section class="compare-hero-banner">
+        <div class="compare-big-number">83.8%</div>
+        <div style="flex: 1 1 320px;">
+          <div style="font-size: 22px; font-weight: 600; line-height: 1.3;">fewer false alarms than XGBoost</div>
+          <p style="margin: 6px 0 0; font-size: 15px; line-height: 1.55; color: #C5D1E4;">A false alarm is a normal account flagged as fraud. Fewer of them means investigators spend their time on real cases.</p>
+        </div>
+      </section>
+
+      <!-- Model Cards Grid (Dynamic, only models with saved results) -->
+      <div class="model-cards-grid" id="compare-model-cards">
+        <!-- Loaded dynamically from /api/metrics -->
+      </div>
+
+      <!-- Side-by-Side Benchmark Comparison Table -->
+      <section class="table-card">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Side by side</h2>
+          <span style="font-size: 14px; color: var(--text-muted);">Higher is better, except false alarms, where lower is better.</span>
+        </div>
+
+        <div class="table-scroll">
+          <div class="benchmark-table-grid" id="benchmark-table-rows">
+            <!-- Populated dynamically with real metrics & horizontal bars -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Three Summary Cards: What this means -->
+      <div style="margin-top: 24px;">
+        <h2 class="section-label" style="margin-bottom: 14px;">What this means</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+          <div style="flex: 1 1 280px; background: #FFFFFF; border: 1px solid var(--border-card); border-radius: 14px; padding: 20px;">
+            <div style="font-size: 16px; font-weight: 600;">It catches more fraud</div>
+            <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary);" id="summary-catches-text">TGAT finds more fraud rings than the other models tested.</p>
+          </div>
+          <div style="flex: 1 1 280px; background: #FFFFFF; border: 1px solid var(--border-card); border-radius: 14px; padding: 20px;">
+            <div style="font-size: 16px; font-weight: 600;">Fewer wasted investigations</div>
+            <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary);" id="summary-alarms-text">It raises far fewer false alarms, so teams chase fewer dead ends.</p>
+          </div>
+          <div style="flex: 1 1 280px; background: #FFFFFF; border: 1px solid var(--border-card); border-radius: 14px; padding: 20px;">
+            <div style="font-size: 16px; font-weight: 600;">Why it works</div>
+            <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary);">It reads who pays whom, and when, instead of judging each transaction alone.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
 
   <script src="app.js"></script>
 </body>

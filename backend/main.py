@@ -343,7 +343,7 @@ def run_batch_analysis(payload: BatchRunRequest):
 
 
 @app.get("/api/analysis/sample")
-def get_sample_benchmark_data(count: int = Query(50, ge=10, le=200)):
+def get_sample_benchmark_data(count: int = Query(50, ge=10, le=2000)):
     """Return a real sample from test.csv for instant 5-minute academic demonstration."""
     ms = get_model_service()
     try:
