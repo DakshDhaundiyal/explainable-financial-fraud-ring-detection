@@ -94,6 +94,18 @@ class TestAnalysisWorkflow(unittest.TestCase):
         acc_detail = acc_res.json()
         self.assertEqual(acc_detail["account_id"], acc_id)
         self.assertTrue(acc_detail["total_transactions"] >= 1)
+        self.assertIn("ai_narrative", acc_detail)
+        self.assertTrue(len(acc_detail["ai_narrative"]) > 10)
+
+        # Check Account Ask AI Endpoint
+        ask_res = self.client.post(
+            f"/api/analysis/{session_id}/account/{acc_id}/ask",
+            json={"question": "Who are the connected accounts?"}
+        )
+        self.assertEqual(ask_res.status_code, 200)
+        ask_data = ask_res.json()
+        self.assertIn("answer", ask_data)
+        self.assertTrue(len(ask_data["answer"]) > 5)
 
         # Check CSV Export
         exp_res = self.client.get(f"/api/analysis/{session_id}/export")

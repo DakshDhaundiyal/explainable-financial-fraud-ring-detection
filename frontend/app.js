@@ -240,9 +240,18 @@ async function handleFileUpload(file) {
     showFileProblem('Please upload a CSV file with columns: sender, receiver, amount, and time.');
     return;
   }
+  if (file.size > 500 * 1024 * 1024) {
+    showFileProblem(`File exceeds maximum allowed size of 500MB (selected: ${(file.size / (1024 * 1024)).toFixed(1)}MB).`);
+    return;
+  }
+
+  const dropText = document.querySelector('.dropzone-text');
+  const origText = dropText ? dropText.textContent : 'Drop a CSV file here';
+  if (dropText) dropText.textContent = `Reading ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`;
 
   const reader = new FileReader();
   reader.onload = async (e) => {
+    if (dropText) dropText.textContent = 'Analyzing and scoring with TGAT model...';
     const csvContent = e.target.result;
     try {
       const runRes = await fetch('/api/analysis/run', {
@@ -270,6 +279,8 @@ async function handleFileUpload(file) {
 
     } catch (err) {
       showFileProblem(err.message || 'Error uploading file.');
+    } finally {
+      if (dropText) dropText.textContent = origText;
     }
   };
   reader.readAsText(file);
@@ -383,6 +394,16 @@ function renderResultsState(data) {
 
   document.getElementById('tile-flagged-pct').textContent = `${data.flagged_rate || 0}% of this batch`;
   document.getElementById('tile-normal-txs').textContent = normal.toLocaleString();
+
+  // 3b. AI Executive Briefing (Prominent Banner)
+  const batchAiText = document.getElementById('ai-batch-briefing-text');
+  const batchAiBadge = document.getElementById('ai-batch-model-badge');
+  if (batchAiText) {
+    batchAiText.textContent = data.ai_briefing || data.executive_summary || 'Network analysis completed.';
+  }
+  if (batchAiBadge) {
+    batchAiBadge.textContent = data.ai_briefing_model || 'Gemini 3.8 Flash';
+  }
   
   // 4. Update Legend text
   const legendRiskText = document.getElementById('legend-risk-text');
@@ -1187,6 +1208,64 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
     calloutBox.className = 'why-callout normal';
     cTitle.textContent = 'Looks normal';
     cDesc.textContent = 'This account moves money in a typical pattern. No action is needed.';
+  }
+
+  // 1b. AI Investigation Narrative & Network Analysis
+  const aiNarrativeText = document.getElementById('ai-narrative-text');
+  const aiModelBadge = document.getElementById('ai-model-badge');
+  const aiAskInput = document.getElementById('ai-ask-input');
+  const aiAskBtn = document.getElementById('ai-ask-btn');
+  const aiAskAnswer = document.getElementById('ai-ask-answer');
+
+  if (aiNarrativeText) {
+    aiNarrativeText.textContent = acc.ai_narrative || 'Network analysis generated.';
+  }
+  if (aiModelBadge) {
+    aiModelBadge.textContent = acc.ai_model_used || 'Gemini 3.8 Flash';
+  }
+  if (aiAskAnswer) {
+    aiAskAnswer.style.display = 'none';
+    aiAskAnswer.textContent = '';
+  }
+  if (aiAskInput) {
+    aiAskInput.value = '';
+    const askHandler = async () => {
+      const q = (aiAskInput.value || '').trim();
+      if (!q) return;
+      if (aiAskBtn) aiAskBtn.disabled = true;
+      if (aiAskAnswer) {
+        aiAskAnswer.style.display = 'block';
+        aiAskAnswer.textContent = 'Analyzing network context...';
+      }
+      try {
+        const askRes = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/account/${encodeURIComponent(acc.account_id)}/ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: q }),
+        });
+        if (!askRes.ok) throw new Error('Question answering failed');
+        const askData = await askRes.json();
+        if (aiAskAnswer) {
+          aiAskAnswer.textContent = askData.answer || 'No answer available.';
+        }
+      } catch (e) {
+        if (aiAskAnswer) {
+          aiAskAnswer.textContent = 'Could not generate an answer at this time.';
+        }
+      } finally {
+        if (aiAskBtn) aiAskBtn.disabled = false;
+      }
+    };
+
+    if (aiAskBtn) {
+      aiAskBtn.onclick = askHandler;
+    }
+    aiAskInput.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        askHandler();
+      }
+    };
   }
 
   // 2. What affected the score: Top 3 behavioral drivers using plain-English templates

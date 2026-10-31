@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from backend.analysis_store import analysis_store
+from backend.llm_explainer import answer_account_question, explain_account_network, explain_batch_overview
 from backend.model_service import ModelService
 from backend.validation import ValidationResult, detect_and_validate_csv
 
@@ -36,6 +37,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    """Ensure static files and API responses are never stale-cached by client browsers."""
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # Global model service instance
 _model_service: Optional[ModelService] = None
@@ -65,6 +76,10 @@ class TransactionInput(BaseModel):
 class BatchRunRequest(BaseModel):
     filename: str = "upload.csv"
     csv_content: str
+
+
+class AccountQuestionRequest(BaseModel):
+    question: str
 
 
 @app.on_event("startup")
@@ -314,7 +329,8 @@ def run_batch_analysis(payload: BatchRunRequest):
     val_result, valid_df = detect_and_validate_csv(content, filename=payload.filename)
 
     if not val_result.valid or valid_df is None or len(valid_df) == 0:
-        raise HTTPException(status_code=400, detail="Uploaded file failed schema validation. Correct errors before running.")
+        detail_msg = val_result.errors[0].message if val_result.errors else "Uploaded file failed schema validation. Correct errors before running."
+        raise HTTPException(status_code=400, detail=detail_msg)
 
     t0 = time.time()
     scored_records = ms.predict_batch(valid_df, causal=True)
@@ -371,6 +387,15 @@ def get_analysis_overview(session_id: Optional[str] = Query(None)):
 
     top_flagged = [t for t in session.transactions if t["classification"] == "FLAGGED"][:5]
 
+    overview_payload = {
+        "session_id": session.session_id,
+        "total_transactions": session.total_transactions,
+        "flagged_transactions": session.flagged_transactions,
+        "high_risk_accounts": session.high_risk_accounts,
+        "threshold": session.threshold,
+    }
+    briefing_res = explain_batch_overview(overview_payload)
+
     return {
         "has_data": True,
         "session_id": session.session_id,
@@ -384,6 +409,8 @@ def get_analysis_overview(session_id: Optional[str] = Query(None)):
         "low_risk_count": session.low_risk_count,
         "high_risk_accounts": session.high_risk_accounts,
         "executive_summary": session.executive_summary,
+        "ai_briefing": briefing_res.get("briefing", ""),
+        "ai_briefing_model": briefing_res.get("model_used", "AI Explainer"),
         "distinct_accounts": session.distinct_accounts,
         "threshold": session.threshold,
         "duration_seconds": session.duration_seconds,
@@ -452,11 +479,30 @@ def get_transaction_detail(session_id: str, tx_id: str):
 
 @app.get("/api/analysis/{session_id}/account/{account_id}")
 def get_account_detail(session_id: str, account_id: str):
-    """Return account history and counterparty interaction volume."""
+    """Return account history, counterparty interaction volume, and LLM network explanation."""
     acc = analysis_store.get_account_history(session_id, account_id)
     if not acc:
         raise HTTPException(status_code=404, detail="Account not found in analysis session.")
+
+    session = analysis_store.get_session(session_id)
+    thresh = session.threshold if session else 0.737155
+    explanation = explain_account_network(acc, session_threshold=thresh)
+    acc["ai_narrative"] = explanation.get("narrative", "")
+    acc["ai_model_used"] = explanation.get("model_used", "AI Explainer")
+    acc["ai_network_context"] = explanation.get("network_context", {})
     return acc
+
+
+@app.post("/api/analysis/{session_id}/account/{account_id}/ask")
+def ask_account_question_endpoint(session_id: str, account_id: str, payload: AccountQuestionRequest):
+    """Ask an interactive follow-up question about this account and its network topology."""
+    acc = analysis_store.get_account_history(session_id, account_id)
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found in analysis session.")
+
+    session = analysis_store.get_session(session_id)
+    thresh = session.threshold if session else 0.737155
+    return answer_account_question(acc, payload.question, session_threshold=thresh)
 
 
 @app.get("/api/analysis/{session_id}/export")

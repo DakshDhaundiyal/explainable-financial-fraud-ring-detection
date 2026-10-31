@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
   <!-- TOP BAR NAVIGATION -->
@@ -35,9 +35,10 @@
         <button type="button" class="tab-btn" id="tab-compare-btn" data-target="tab-compare-content" aria-selected="false">Compare models</button>
       </nav>
 
-      <div class="header-status">
+      <div class="header-status" style="display: flex; align-items: center; gap: 8px;">
         <span class="status-dot"></span>
         <span>Model ready</span>
+        <span class="ai-status-badge" style="font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: #EEF2FF; color: #4338CA; font-weight: 600; border: 1px solid #C7D2FE;">✨ AI Explainer Active</span>
       </div>
     </div>
   </header>
@@ -74,7 +75,7 @@
               <button type="button" class="btn btn-secondary" id="btn-choose-file">Choose file</button>
               <input type="file" id="file-input-csv" accept=".csv" style="display: none;">
             </div>
-            <p style="margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.5;">Your file needs the sender, receiver, amount and time of each transaction.</p>
+            <p style="margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.5;">CSV files up to 500MB supported. Auto-maps sender, receiver, amount, and time.</p>
           </section>
 
             <!-- Demo Card -->
@@ -126,8 +127,8 @@
             <div class="step-card">
               <span class="step-number">3</span>
               <div>
-                <div class="step-title">Read the result</div>
-                <div class="step-desc">See who looks risky, with a plain-English reason.</div>
+                <div class="step-title">✨ AI Explainer Breakdown</div>
+                <div class="step-desc">Gemini 3.8 Flash explains the network, connected accounts, and laundering rings in plain English.</div>
               </div>
             </div>
           </div>
@@ -185,6 +186,18 @@
             <div class="tile-subtext">than XGBoost</div>
           </div>
         </section>
+
+        <!-- 3b. AI Investigation Executive Briefing (Prominent Full-Width Banner) -->
+        <div class="ai-batch-briefing-card" id="ai-batch-briefing-card" style="margin-top: 20px; padding: 18px 22px; border-radius: 14px; background: linear-gradient(135deg, #1E1B4B 0%, #312E81 100%); color: #FFFFFF; box-shadow: 0 4px 16px rgba(49, 46, 129, 0.2);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">✨</span>
+              <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #FFFFFF; letter-spacing: 0.02em;">AI Investigation Briefing (Full Batch)</h3>
+            </div>
+            <span class="mono" id="ai-batch-model-badge" style="font-size: 11px; padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); color: #E0E7FF; font-weight: 600;">Gemini 3.8 Flash</span>
+          </div>
+          <p id="ai-batch-briefing-text" style="margin: 0; font-size: 13.5px; line-height: 1.6; color: #E0E7FF;">Analyzing batch graph structure...</p>
+        </div>
 
         <!-- 4. Two Columns: Graph (Left) & Selected Account (Right) -->
         <div class="investigation-grid">
@@ -280,6 +293,28 @@
               <div class="why-callout normal" id="why-callout-box">
                 <div class="callout-title" id="why-callout-title">Looks normal</div>
                 <p class="callout-desc" id="why-callout-desc">This account moves money in a typical pattern. No action is needed.</p>
+              </div>
+
+              <!-- AI Investigation Narrative & Network Analysis -->
+              <div class="ai-narrative-card" id="ai-narrative-card" style="margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: linear-gradient(135deg, rgba(238, 242, 255, 0.95), rgba(245, 243, 255, 0.95)); border: 1px solid #C7D2FE; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 16px;">✨</span>
+                    <span style="font-size: 13px; font-weight: 700; color: #3730A3; letter-spacing: 0.02em;">AI Investigation Narrative</span>
+                  </div>
+                  <span class="mono" id="ai-model-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #E0E7FF; color: #4338CA; font-weight: 600;">Gemini 3.8 Flash</span>
+                </div>
+                <p id="ai-narrative-text" style="margin: 0; font-size: 13px; line-height: 1.55; color: #1E1B4B; white-space: pre-line;">Generating network-level explanation...</p>
+
+                <!-- Interactive Follow-up Question -->
+                <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(199, 210, 254, 0.6);">
+                  <div style="font-size: 11.5px; font-weight: 600; color: #4F46E5; margin-bottom: 6px;">Ask AI about this network:</div>
+                  <div style="display: flex; gap: 6px;">
+                    <input type="text" id="ai-ask-input" placeholder="e.g. Who are the connected accounts?" style="flex: 1; padding: 7px 10px; font-size: 12px; border: 1px solid #C7D2FE; border-radius: 8px; outline: none; background: #FFFFFF; color: #1E1B4B;">
+                    <button type="button" id="ai-ask-btn" class="btn btn-primary btn-sm" style="padding: 0 12px; font-size: 12px; height: 32px; background: #4F46E5; border: none; color: #FFFFFF; border-radius: 8px; cursor: pointer; font-weight: 600;">Ask</button>
+                  </div>
+                  <div id="ai-ask-answer" style="display: none; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #FFFFFF; border: 1px solid #E0E7FF; font-size: 12.5px; line-height: 1.45; color: #1E1B4B;"></div>
+                </div>
               </div>
 
               <h3 style="margin: 22px 0 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);">What affected the score</h3>
@@ -392,6 +427,6 @@
 
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 </html>

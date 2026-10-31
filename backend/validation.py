@@ -16,8 +16,8 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel
 
-MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024  # 15 MB
-MAX_UPLOAD_ROWS = 2000  # Safe micro-batch processing limit for demo-ready responsiveness
+MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024  # 500 MB
+MAX_UPLOAD_ROWS = 10000  # Safe micro-batch processing limit for demo-ready responsiveness
 
 RAW_IBM_AML_COLUMNS = [
     "Timestamp",
@@ -127,27 +127,122 @@ def detect_and_validate_csv(csv_bytes: bytes, filename: str = "upload.csv") -> T
     format_detected = "raw_ibm_aml" if has_raw_ibm else ("processed_temporal_gnn" if has_gnn else "unknown")
 
     if format_detected == "unknown":
-        missing_raw = [c for c in RAW_IBM_AML_COLUMNS if c not in df.columns]
-        missing_gnn = [c for c in MINIMAL_GNN_COLUMNS if c not in df.columns]
-        errors.append(ValidationErrorDetail(
-            message=f"Unrecognized schema. Must match either Raw IBM AML (missing: {missing_raw[:4]}) or Processed GNN (missing: {missing_gnn})."
-        ))
-        return ValidationResult(
-            valid=False,
-            format_detected="unknown",
-            total_rows=total_rows,
-            valid_rows=0,
-            rejected_rows=total_rows,
-            errors=errors,
-            warnings=warnings,
-            columns_present=columns_present,
-            sample_preview=df.head(5).to_dict(orient="records"),
-        ), None
+        # Smart column alias resolution to support standard datasets (Ethereum, PaySim, Bitcoin, etc.)
+        col_lookup = {c.strip().lower().replace("_", "").replace("-", "").replace(" ", ""): c for c in df.columns}
+
+        def find_col(candidates):
+            for cand in candidates:
+                cand_clean = cand.lower().replace("_", "").replace("-", "").replace(" ", "")
+                if cand_clean in col_lookup:
+                    return col_lookup[cand_clean]
+            return None
+
+        from_col = find_col([
+            "From Account", "from_account", "from_address", "fromaddress",
+            "sender", "sender_account", "source", "source_account", "src",
+            "nameorig", "name_orig", "origin", "from", "sender_id", "from_acc"
+        ])
+        to_col = find_col([
+            "To Account", "to_account", "to_address", "toaddress",
+            "receiver", "receiver_account", "target", "destination",
+            "destination_account", "dest", "dst", "namedest", "name_dest",
+            "to", "receiver_id", "to_acc"
+        ])
+        time_col = find_col([
+            "Timestamp", "time", "date", "datetime", "trans_date_trans_time",
+            "block_timestamp", "txtime", "tx_time", "step", "epoch", "block_time"
+        ])
+        amt_col = find_col([
+            "Amount Received", "Amount Paid", "amount", "value", "amt",
+            "trans_amount", "transaction_amount", "val", "tx_amount"
+        ])
+
+        if from_col and to_col and time_col and amt_col:
+            # Map into canonical schema
+            if from_col != "From Account":
+                df["From Account"] = df[from_col]
+            if to_col != "To Account":
+                df["To Account"] = df[to_col]
+            if time_col != "Timestamp":
+                df["Timestamp"] = df[time_col]
+
+            amt_recv_col = find_col(["Amount Received", "amount_received"])
+            amt_paid_col = find_col(["Amount Paid", "amount_paid"])
+            if amt_recv_col:
+                df["Amount Received"] = df[amt_recv_col]
+            else:
+                df["Amount Received"] = df[amt_col]
+
+            if amt_paid_col:
+                df["Amount Paid"] = df[amt_paid_col]
+            else:
+                df["Amount Paid"] = df[amt_col]
+
+            # Populate defaults for bank & currency if absent
+            from_bank_col = find_col(["From Bank", "from_bank", "source_bank", "bank_src"])
+            to_bank_col = find_col(["To Bank", "to_bank", "target_bank", "bank_dst"])
+            df["From Bank"] = df[from_bank_col] if from_bank_col else "BANK_SRC"
+            df["To Bank"] = df[to_bank_col] if to_bank_col else "BANK_DST"
+
+            df["Receiving Currency"] = df["Receiving Currency"] if "Receiving Currency" in df.columns else "USD"
+            df["Payment Currency"] = df["Payment Currency"] if "Payment Currency" in df.columns else "USD"
+            df["Payment Format"] = df["Payment Format"] if "Payment Format" in df.columns else "Transfer"
+
+            format_detected = "auto_mapped_gnn"
+            warnings.append(
+                f"Auto-mapped dataset schema: sender='{from_col}', receiver='{to_col}', timestamp='{time_col}', amount='{amt_col}'."
+            )
+        else:
+            missing_elements = []
+            if not from_col:
+                missing_elements.append("Sender / From Account (e.g. 'From Account', 'from_address', 'sender', 'nameOrig')")
+            if not to_col:
+                missing_elements.append("Receiver / To Account (e.g. 'To Account', 'to_address', 'receiver', 'nameDest')")
+            if not time_col:
+                missing_elements.append("Timestamp / Time (e.g. 'Timestamp', 'time', 'date', 'step')")
+            if not amt_col:
+                missing_elements.append("Amount (e.g. 'Amount Received', 'amount', 'value')")
+
+            errors.append(ValidationErrorDetail(
+                message=f"Missing essential columns: {', '.join(missing_elements)}."
+            ))
+            return ValidationResult(
+                valid=False,
+                format_detected="unknown",
+                total_rows=total_rows,
+                valid_rows=0,
+                rejected_rows=total_rows,
+                errors=errors,
+                warnings=warnings,
+                columns_present=columns_present,
+                sample_preview=df.head(5).to_dict(orient="records"),
+            ), None
 
     # 4. Row-level Validation
     # Timestamp parsing
     try:
-        df["_parsed_ts"] = pd.to_datetime(df["Timestamp"], errors="coerce")
+        ts_sample = df["Timestamp"].dropna().iloc[0] if len(df["Timestamp"].dropna()) > 0 else None
+        is_numeric = False
+        if ts_sample is not None:
+            try:
+                float(ts_sample)
+                is_numeric = True
+            except (ValueError, TypeError):
+                is_numeric = False
+
+        if is_numeric:
+            num_ts = pd.to_numeric(df["Timestamp"], errors="coerce")
+            max_val = float(num_ts.max()) if len(num_ts.dropna()) > 0 else 0
+            if max_val > 1e11:  # Milliseconds
+                df["_parsed_ts"] = pd.to_datetime(num_ts, unit="ms", errors="coerce")
+            elif max_val > 1e8:  # Seconds
+                df["_parsed_ts"] = pd.to_datetime(num_ts, unit="s", errors="coerce")
+            else:  # Small numbers like simulation steps (e.g. PaySim steps 1..744)
+                base = pd.to_datetime("2023-01-01 00:00:00")
+                df["_parsed_ts"] = base + pd.to_timedelta(num_ts, unit="h")
+        else:
+            df["_parsed_ts"] = pd.to_datetime(df["Timestamp"], errors="coerce")
+
         bad_ts_count = int(df["_parsed_ts"].isna().sum())
         if bad_ts_count > 0:
             errors.append(ValidationErrorDetail(
