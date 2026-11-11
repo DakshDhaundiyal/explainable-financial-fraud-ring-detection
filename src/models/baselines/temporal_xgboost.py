@@ -11,6 +11,7 @@ Validation is used for evaluation/model monitoring.
 Test is used only for final evaluation.
 """
 
+import argparse
 import json
 import os
 import time
@@ -87,7 +88,7 @@ RESULTS_DIR = (
 # DATA LOADING
 # ============================================================
 
-def load_split(split_name):
+def load_split(split_name, data_dir=DATA_DIR):
     """
     Load one temporal modeling split.
 
@@ -96,7 +97,7 @@ def load_split(split_name):
     """
 
     path = os.path.join(
-        DATA_DIR,
+        data_dir,
         f"{split_name}.csv",
     )
 
@@ -186,8 +187,29 @@ def validate_features(
 
 def main():
 
+    parser = argparse.ArgumentParser(
+        description="Train and evaluate Temporal XGBoost baseline."
+    )
+    parser.add_argument(
+        "--data-dir",
+        default=DATA_DIR,
+    )
+    parser.add_argument(
+        "--results-dir",
+        default=RESULTS_DIR,
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+    )
+    args = parser.parse_args()
+
+    data_dir = args.data_dir
+    results_dir = args.results_dir
+
     os.makedirs(
-        RESULTS_DIR,
+        results_dir,
         exist_ok=True,
     )
 
@@ -198,7 +220,13 @@ def main():
     print("=" * 70)
 
     print(
-        f"\nCurrent transaction features: "
+        f"\nData directory: {data_dir}"
+    )
+    print(
+        f"Results directory: {results_dir}"
+    )
+    print(
+        f"Current transaction features: "
         f"{len(CURRENT_TRANSACTION_FEATURES)}"
     )
 
@@ -217,15 +245,18 @@ def main():
     # ========================================================
 
     X_train, y_train = load_split(
-        "train"
+        "train",
+        data_dir=data_dir,
     )
 
     X_val, y_val = load_split(
-        "validation"
+        "validation",
+        data_dir=data_dir,
     )
 
     X_test, y_test = load_split(
-        "test"
+        "test",
+        data_dir=data_dir,
     )
 
     # ========================================================
@@ -286,7 +317,7 @@ def main():
         eval_metric="aucpr",
         tree_method="hist",
         scale_pos_weight=scale_pos_weight,
-        random_state=42,
+        random_state=args.seed,
         n_jobs=-1,
     )
 
@@ -412,7 +443,7 @@ def main():
     # ========================================================
 
     model_path = os.path.join(
-        RESULTS_DIR,
+        results_dir,
         "model.json",
     )
 
@@ -435,12 +466,12 @@ def main():
     )
 
     validation_predictions_path = os.path.join(
-        RESULTS_DIR,
+        results_dir,
         "validation_predictions.csv",
     )
 
     test_predictions_path = os.path.join(
-        RESULTS_DIR,
+        results_dir,
         "test_predictions.csv",
     )
 
@@ -474,6 +505,12 @@ def main():
         "model": (
             "Temporal XGBoost"
         ),
+
+        "data_dir": data_dir,
+
+        "results_dir": results_dir,
+
+        "seed": args.seed,
 
         "feature_count": len(
             FEATURE_COLUMNS
@@ -512,7 +549,7 @@ def main():
             "objective": "binary:logistic",
             "eval_metric": "aucpr",
             "tree_method": "hist",
-            "random_state": 42,
+            "random_state": args.seed,
         },
 
         "validation": (
@@ -525,7 +562,7 @@ def main():
     }
 
     metrics_path = os.path.join(
-        RESULTS_DIR,
+        results_dir,
         "metrics.json",
     )
 

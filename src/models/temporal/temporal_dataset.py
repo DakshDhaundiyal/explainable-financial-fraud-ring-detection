@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from src.models.temporal.temporal_state import TemporalStateStore
+from src.models.temporal.tgat_dataset import OMITTED_CSV_TEMPORAL_FEATURES, to_unix_seconds
 
 
 # ============================================================
@@ -365,19 +366,21 @@ def process_split(
             )
 
             # ------------------------------------------------
-            # Internal Unix timestamp.
+            # Internal Unix timestamp (1-second resolution).
             #
-            # This is only used for temporal state calculations.
+            # Under pandas 3.x parsed datetimes default to
+            # datetime64[us], so ``astype("int64") // 10**9``
+            # would quantize timestamps into 1,000-second
+            # intervals. Convert explicitly via to_unix_seconds.
             # The original Timestamp is preserved in output.
             # ------------------------------------------------
 
-            chunk["_timestamp"] = (
-                chunk["Timestamp"].astype("int64")
-                // 10**9
+            chunk["_timestamp"] = to_unix_seconds(
+                chunk["Timestamp"]
             )
 
             # ------------------------------------------------
-            # Group by exact timestamp.
+            # Group by exact 1-second timestamp.
             # ------------------------------------------------
 
             for timestamp, group in chunk.groupby(
@@ -397,6 +400,12 @@ def process_split(
                     pending_timestamp = timestamp
 
                     continue
+
+                if timestamp < pending_timestamp:
+                    raise ValueError(
+                        f"Non-chronological timestamp across chunks in {input_path}: "
+                        f"{timestamp} < {pending_timestamp}"
+                    )
 
                 # --------------------------------------------
                 # Same timestamp continues into this chunk.
@@ -986,6 +995,18 @@ def main():
             len(CURRENT_TRANSACTION_FEATURES)
             + len(TEMPORAL_FEATURE_COLUMNS)
         ),
+
+        "tgat_model_feature_count": (
+            len(CURRENT_TRANSACTION_FEATURES)
+            + len(TEMPORAL_FEATURE_COLUMNS)
+            - len(OMITTED_CSV_TEMPORAL_FEATURES)
+        ),
+
+        "omitted_by_tgat": list(OMITTED_CSV_TEMPORAL_FEATURES),
+
+        "timestamp_resolution_seconds": 1,
+
+        "timestamp_unit": "seconds",
 
         "chunk_size": args.chunk_size,
 

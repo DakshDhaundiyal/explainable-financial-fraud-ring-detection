@@ -21,7 +21,15 @@ from sklearn.metrics import average_precision_score
 from src.models.common.evaluation import classification_metrics
 from src.models.temporal.feature_scaler import TemporalFeatureScaler
 from src.models.temporal.tgat_core import TGATTransactionModel
-from src.models.temporal.tgat_dataset import ALL_FEATURES, CURRENT_FEATURES, TARGET, EventFeatureStore, build_batch
+from src.models.temporal.tgat_dataset import (
+    ALL_FEATURES,
+    CURRENT_FEATURES,
+    TARGET,
+    EventFeatureStore,
+    build_batch,
+    build_batch_from_arrays,
+    to_unix_seconds,
+)
 
 DEFAULT_DATA = Path("data/processed/temporal_gnn")
 DEFAULT_RESULTS = Path("results/tgat")
@@ -31,11 +39,14 @@ def seed_everything(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def read_frame(path: Path, rows: int | None = None) -> pd.DataFrame:
     frame = pd.read_csv(path, nrows=rows)
-    frame["_timestamp"] = pd.to_datetime(frame["Timestamp"], errors="raise").astype("int64") // 1_000_000_000
+    parsed = pd.to_datetime(frame["Timestamp"], format="mixed", errors="raise")
+    frame["_timestamp"] = to_unix_seconds(parsed)
     frame = frame.sort_values("_timestamp", kind="stable").reset_index(drop=True)
     return frame
 
@@ -50,6 +61,73 @@ def _row_layout(frame: pd.DataFrame, active_features=None) -> tuple[int, int, in
         idx["_timestamp"],
         tuple(idx[name] for name in (active_features or ALL_FEATURES)),
     )
+
+
+def _group_boundaries(timestamps_arr: np.ndarray) -> list[int]:
+    n_rows = len(timestamps_arr)
+    if n_rows == 0:
+        return []
+    splits = np.flatnonzero(timestamps_arr[1:] != timestamps_arr[:-1]) + 1
+    boundaries = splits.tolist()
+    boundaries.append(n_rows)
+    return boundaries
+
+
+def _resolve_account_ids(accounts: list[str], store: EventFeatureStore) -> list[int]:
+    acct_map = store.account_to_id
+    next_id = len(acct_map)
+    resolved = [0] * len(accounts)
+    for idx, acc in enumerate(accounts):
+        aid = acct_map.get(acc)
+        if aid is None:
+            aid = next_id
+            acct_map[acc] = aid
+            next_id += 1
+        resolved[idx] = aid
+    return resolved
+
+
+def _add_slice_to_store(
+    senders: np.ndarray,
+    receivers: np.ndarray,
+    timestamps_arr: np.ndarray,
+    feature_matrix: np.ndarray,
+    start: int,
+    end: int,
+    store: EventFeatureStore,
+) -> None:
+    """Insert a chronological slice into history without constructing pandas objects."""
+    add_event = store.store.add_event
+    get_id = store.get_id
+    for idx in range(start, end):
+        src_id = get_id(str(senders[idx]))
+        dst_id = get_id(str(receivers[idx]))
+        add_event(
+            int(timestamps_arr[idx]),
+            src_id,
+            dst_id,
+            feature_matrix[idx],
+        )
+
+
+def _add_resolved_slice_to_store(
+    sender_ids: list[int],
+    receiver_ids: list[int],
+    ts_list: list[int],
+    feature_matrix: np.ndarray,
+    start: int,
+    end: int,
+    store: EventFeatureStore,
+) -> None:
+    """Insert a chronological slice using pre-resolved node IDs and read-only views."""
+    add_event = store.store.add_event
+    for idx in range(start, end):
+        add_event(
+            ts_list[idx],
+            sender_ids[idx],
+            receiver_ids[idx],
+            feature_matrix[idx],
+        )
 
 
 def _add_chunk_to_store(
@@ -70,6 +148,22 @@ def _add_chunk_to_store(
         )
 
 
+def _extract_split_arrays(frame: pd.DataFrame, active_features=None, resolve_ids: bool = True, store: EventFeatureStore | None = None):
+    active = list(active_features or ALL_FEATURES)
+    timestamps_arr = frame["_timestamp"].to_numpy(dtype=np.int64)
+    ts_list = timestamps_arr.tolist()
+    group_ends = _group_boundaries(timestamps_arr)
+    feature_matrix = np.ascontiguousarray(frame[active].to_numpy(dtype=np.float32))
+    labels_arr = np.ascontiguousarray(frame[TARGET].to_numpy(dtype=np.float32))
+    if resolve_ids and store is not None:
+        sender_ids = _resolve_account_ids(frame["From Account"].astype(str).tolist(), store)
+        receiver_ids = _resolve_account_ids(frame["To Account"].astype(str).tolist(), store)
+    else:
+        sender_ids = None
+        receiver_ids = None
+    return timestamps_arr, ts_list, group_ends, feature_matrix, labels_arr, sender_ids, receiver_ids
+
+
 def make_batches(frame: pd.DataFrame, store: EventFeatureStore, batch_size: int, neighbor_k: int, active_features=None, use_neighbors=True):
     """Yield causal micro-batches without exposing same-timestamp events.
 
@@ -78,62 +172,62 @@ def make_batches(frame: pd.DataFrame, store: EventFeatureStore, batch_size: int,
     against the same pre-T history. The complete timestamp group is inserted
     into history only after its final micro-batch has been yielded.
     """
-    start = 0
-    source_idx, destination_idx, timestamp_idx, feature_indices = _row_layout(
-        frame, active_features or ALL_FEATURES
+    timestamps_arr, ts_list, group_ends, feature_matrix, labels_arr, sender_ids, receiver_ids = _extract_split_arrays(
+        frame, active_features, resolve_ids=use_neighbors, store=store
     )
-    while start < len(frame):
-        group_timestamp = int(frame.iloc[start]["_timestamp"])
-        group_end = start + 1
-        while group_end < len(frame) and int(frame.iloc[group_end]["_timestamp"]) == group_timestamp:
-            group_end += 1
 
-        group = frame.iloc[start:group_end]
-
+    start = 0
+    for group_end in group_ends:
         # Frames are already transformed by the train-only scaler. Passing the
         # scaler again here would double-transform query features while stored
         # event features remain single-transformed.
-        for micro_start in range(0, len(group), batch_size):
-            micro_end = min(micro_start + batch_size, len(group))
-            chunk = group.iloc[micro_start:micro_end]
-            yield build_batch(
-                chunk,
+        for micro_start in range(start, group_end, batch_size):
+            micro_end = min(micro_start + batch_size, group_end)
+            yield build_batch_from_arrays(
+                None,
+                None,
+                timestamps_arr[micro_start:micro_end],
+                feature_matrix[micro_start:micro_end],
+                labels_arr[micro_start:micro_end],
                 store,
                 neighbor_k,
                 feature_scaler=None,
-                active_features=active_features,
                 use_neighbors=use_neighbors,
+                sender_ids=sender_ids[micro_start:micro_end] if sender_ids is not None else None,
+                receiver_ids=receiver_ids[micro_start:micro_end] if receiver_ids is not None else None,
             )
 
         # Crucial causal boundary: no event at group_timestamp is visible to
         # any other query at the same timestamp.
-        _add_chunk_to_store(
-            group, store, source_idx, destination_idx, timestamp_idx, feature_indices
-        )
+        if use_neighbors and sender_ids is not None and receiver_ids is not None:
+            _add_resolved_slice_to_store(
+                sender_ids, receiver_ids, ts_list, feature_matrix, start, group_end, store
+            )
         start = group_end
 
 
-def populate_history(frame: pd.DataFrame, store: EventFeatureStore, batch_size: int, active_features=None) -> int:
-    """Rebuild causal history without running the TGAT model.
+def populate_history(frame: pd.DataFrame, store: EventFeatureStore, batch_size: int, active_features=None, use_neighbors: bool = True) -> int:
+    """Rebuild causal history without running the TGAT model."""
+    active = list(active_features or ALL_FEATURES)
+    timestamps_arr = frame["_timestamp"].to_numpy(dtype=np.int64)
+    n_rows = len(timestamps_arr)
+    if not use_neighbors or n_rows == 0:
+        return 0
+    ts_list = timestamps_arr.tolist()
+    feature_matrix = np.ascontiguousarray(frame[active].to_numpy(dtype=np.float32))
+    sender_ids = _resolve_account_ids(frame["From Account"].astype(str).tolist(), store)
+    receiver_ids = _resolve_account_ids(frame["To Account"].astype(str).tolist(), store)
 
-    The previous final-evaluation path called ``predict(train, ...)`` only to
-    populate the temporal store. That unnecessarily performed a full forward
-    pass over every training transaction. This helper preserves the exact
-    timestamp-safe insertion order while avoiding model inference, tensor
-    construction, and score generation for the training split.
-    """
     start = 0
-    source_idx, destination_idx, timestamp_idx, feature_indices = _row_layout(frame, active_features or ALL_FEATURES)
     batches = 0
-    while start < len(frame):
-        end = min(start + batch_size, len(frame))
-        if end < len(frame):
-            timestamp = frame.iloc[end - 1]["_timestamp"]
-            while end < len(frame) and frame.iloc[end]["_timestamp"] == timestamp:
+    while start < n_rows:
+        end = min(start + batch_size, n_rows)
+        if end < n_rows:
+            timestamp = ts_list[end - 1]
+            while end < n_rows and ts_list[end] == timestamp:
                 end += 1
-        chunk = frame.iloc[start:end]
-        _add_chunk_to_store(
-            chunk, store, source_idx, destination_idx, timestamp_idx, feature_indices
+        _add_resolved_slice_to_store(
+            sender_ids, receiver_ids, ts_list, feature_matrix, start, end, store
         )
         batches += 1
         start = end
@@ -142,46 +236,87 @@ def populate_history(frame: pd.DataFrame, store: EventFeatureStore, batch_size: 
 
 def train_epoch(model, frame, store, optimizer, criterion, batch_size, neighbor_k, negative_ratio, device, active_features=None, use_neighbors=True):
     model.train()
-    total_loss = 0.0
+    total_loss_t = torch.zeros((), dtype=torch.float64, device=device)
     used = 0
     positives = 0
     negatives = 0
     total_batches = 0
-    for batch in make_batches(frame, store, batch_size, neighbor_k, active_features, use_neighbors):
-        total_batches += 1
-        labels = batch.labels
-        positive_idx = torch.nonzero(labels == 1, as_tuple=False).flatten()
-        negative_idx = torch.nonzero(labels == 0, as_tuple=False).flatten()
-        keep_negative = min(len(negative_idx), max(1, len(positive_idx) * negative_ratio))
-        if keep_negative < len(negative_idx):
-            perm = torch.randperm(len(negative_idx))[:keep_negative]
-            negative_idx = negative_idx[perm]
-        keep = torch.cat([positive_idx, negative_idx])
-        if len(keep) == 0:
-            continue
+    non_blocking = device.type == "cuda"
 
-        transaction = batch.transaction_features[keep].to(device)
-        sender = batch.sender_features[keep].to(device)
-        sender_delta = batch.sender_delta_seconds[keep].to(device)
-        receiver = batch.receiver_features[keep].to(device)
-        receiver_delta = batch.receiver_delta_seconds[keep].to(device)
-        y = labels[keep].to(device)
+    timestamps_arr, ts_list, group_ends, feature_matrix, labels_arr, sender_ids, receiver_ids = _extract_split_arrays(
+        frame, active_features, resolve_ids=use_neighbors, store=store
+    )
 
-        optimizer.zero_grad(set_to_none=True)
-        logits, _ = model(transaction, sender, sender_delta, receiver, receiver_delta)
-        loss = criterion(logits, y)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
-        optimizer.step()
+    start = 0
+    for group_end in group_ends:
+        for micro_start in range(start, group_end, batch_size):
+            micro_end = min(micro_start + batch_size, group_end)
+            total_batches += 1
+            labels = torch.from_numpy(labels_arr[micro_start:micro_end])
+            positive_idx = torch.nonzero(labels == 1, as_tuple=False).flatten()
+            negative_idx = torch.nonzero(labels == 0, as_tuple=False).flatten()
+            keep_negative = min(len(negative_idx), max(1, len(positive_idx) * negative_ratio))
+            if keep_negative < len(negative_idx):
+                perm = torch.randperm(len(negative_idx))[:keep_negative]
+                negative_idx = negative_idx[perm]
+            keep = torch.cat([positive_idx, negative_idx])
+            if len(keep) == 0:
+                continue
 
-        total_loss += float(loss.item()) * len(keep)
-        used += len(keep)
-        positives += int((y == 1).sum())
-        negatives += int((y == 0).sum())
+            keep_np = keep.numpy()
+            keep_list = keep_np.tolist()
+            if use_neighbors and sender_ids is not None and receiver_ids is not None:
+                batch_sender_ids = [sender_ids[micro_start + i] for i in keep_list]
+                batch_receiver_ids = [receiver_ids[micro_start + i] for i in keep_list]
+            else:
+                batch_sender_ids = None
+                batch_receiver_ids = None
 
-        if total_batches % 100 == 0:
-            print(f"  processed {total_batches} batches | queries={used:,} | pos={positives:,} | neg={negatives:,}", flush=True)
-    return total_loss / max(used, 1), positives, negatives, total_batches
+            batch = build_batch_from_arrays(
+                None,
+                None,
+                timestamps_arr[micro_start:micro_end][keep_np],
+                feature_matrix[micro_start:micro_end][keep_np],
+                labels_arr[micro_start:micro_end][keep_np],
+                store,
+                neighbor_k,
+                feature_scaler=None,
+                use_neighbors=use_neighbors,
+                sender_ids=batch_sender_ids,
+                receiver_ids=batch_receiver_ids,
+            )
+
+            transaction = batch.transaction_features.to(device, non_blocking=non_blocking)
+            sender = batch.sender_features.to(device, non_blocking=non_blocking)
+            sender_delta = batch.sender_delta_seconds.to(device, non_blocking=non_blocking)
+            receiver = batch.receiver_features.to(device, non_blocking=non_blocking)
+            receiver_delta = batch.receiver_delta_seconds.to(device, non_blocking=non_blocking)
+            y = batch.labels.to(device, non_blocking=non_blocking)
+
+            optimizer.zero_grad(set_to_none=True)
+            logits, _ = model(transaction, sender, sender_delta, receiver, receiver_delta)
+            loss = criterion(logits, y)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+            optimizer.step()
+
+            batch_count = len(keep)
+            batch_pos = len(positive_idx)
+            total_loss_t += loss.detach().double() * batch_count
+            used += batch_count
+            positives += batch_pos
+            negatives += batch_count - batch_pos
+
+            if total_batches % 100 == 0:
+                print(f"  processed {total_batches} batches | queries={used:,} | pos={positives:,} | neg={negatives:,}", flush=True)
+
+        if use_neighbors and sender_ids is not None and receiver_ids is not None:
+            _add_resolved_slice_to_store(
+                sender_ids, receiver_ids, ts_list, feature_matrix, start, group_end, store
+            )
+        start = group_end
+
+    return float(total_loss_t.item()) / max(used, 1), positives, negatives, total_batches
 
 
 def predict(model, frame, store, batch_size, neighbor_k, device, active_features=None, use_neighbors=True):
@@ -189,20 +324,27 @@ def predict(model, frame, store, batch_size, neighbor_k, device, active_features
     scores = []
     labels = []
     timestamps = []
+    non_blocking = device.type == "cuda"
     with torch.no_grad():
         for batch in make_batches(frame, store, batch_size, neighbor_k, active_features, use_neighbors):
             output = model(
-                batch.transaction_features.to(device),
-                batch.sender_features.to(device),
-                batch.sender_delta_seconds.to(device),
-                batch.receiver_features.to(device),
-                batch.receiver_delta_seconds.to(device),
+                batch.transaction_features.to(device, non_blocking=non_blocking),
+                batch.sender_features.to(device, non_blocking=non_blocking),
+                batch.sender_delta_seconds.to(device, non_blocking=non_blocking),
+                batch.receiver_features.to(device, non_blocking=non_blocking),
+                batch.receiver_delta_seconds.to(device, non_blocking=non_blocking),
             )
             logits, _ = output
-            scores.extend(torch.sigmoid(logits).cpu().numpy().tolist())
-            labels.extend(batch.labels.numpy().tolist())
-            timestamps.extend(batch.timestamps.numpy().tolist())
-    return np.asarray(labels, dtype=np.int64), np.asarray(scores, dtype=np.float64), np.asarray(timestamps, dtype=np.int64)
+            scores.append(torch.sigmoid(logits).cpu().numpy())
+            labels.append(batch.labels.numpy())
+            timestamps.append(batch.timestamps.numpy())
+    if not scores:
+        return np.empty(0, dtype=np.int64), np.empty(0, dtype=np.float64), np.empty(0, dtype=np.int64)
+    return (
+        np.concatenate(labels).astype(np.int64, copy=False),
+        np.concatenate(scores).astype(np.float64, copy=False),
+        np.concatenate(timestamps).astype(np.int64, copy=False),
+    )
 
 
 def evaluate(labels, scores):
@@ -228,6 +370,7 @@ def main() -> None:
     parser.add_argument("--num-heads", type=int, default=2)
     parser.add_argument("--num-layers", type=int, choices=[1,2], default=2)
     parser.add_argument("--dropout", type=float, default=0.2)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     if args.ablation == "no_temporal_features":
@@ -238,7 +381,7 @@ def main() -> None:
     use_time_encoding = args.ablation != "no_time_encoding"
     max_history = args.max_history if args.max_history is not None else args.neighbor_k
 
-    seed_everything(42)
+    seed_everything(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_rows = 5000 if args.smoke else args.max_train_rows
     val_rows = 2000 if args.smoke else args.max_validation_rows
@@ -278,9 +421,28 @@ def main() -> None:
     criterion = torch.nn.BCEWithLogitsLoss()
 
     args.results_dir.mkdir(parents=True, exist_ok=True)
+    (args.results_dir / "scaler_params.json").write_text(
+        json.dumps(
+            {
+                "features": list(scaler.features),
+                "mean": scaler.mean.tolist(),
+                "scale": scaler.scale.tolist(),
+                "clip": float(scaler.clip),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    model_parameters = sum(p.numel() for p in model.parameters())
+    timestamp_groups = {
+        "train": int(train["_timestamp"].nunique()),
+        "validation": int(validation["_timestamp"].nunique()),
+        "test": int(test["_timestamp"].nunique()),
+    }
     config = vars(args).copy()
     config.update({
         "device": str(device),
+        "seed": args.seed,
         "feature_count": len(active_features),
         "active_features": active_features,
         "ablation": args.ablation,
@@ -291,8 +453,12 @@ def main() -> None:
         "num_heads": args.num_heads,
         "num_layers": args.num_layers,
         "dropout": args.dropout,
+        "model_parameters": model_parameters,
         "current_feature_count": len(CURRENT_FEATURES),
-        "temporal_feature_count": len(ALL_FEATURES) - len(CURRENT_FEATURES),
+        "temporal_feature_count": len(active_features) - len(CURRENT_FEATURES),
+        "timestamp_unit": "seconds",
+        "timestamp_resolution_seconds": 1,
+        "timestamp_groups": timestamp_groups,
         "feature_scaling": "train_only_mean_std_clip_10",
     })
     (args.results_dir / "config.json").write_text(json.dumps(config, indent=2, default=str), encoding="utf-8")
@@ -342,7 +508,9 @@ def main() -> None:
     print("\nRebuilding train history for final validation/test evaluation...", flush=True)
     evaluation_store = EventFeatureStore(max_history=max_history)
     history_start = time.time()
-    history_batches = populate_history(train, evaluation_store, args.batch_size, active_features)
+    history_batches = populate_history(
+        train, evaluation_store, args.batch_size, active_features, use_neighbors=use_neighbors
+    )
     print(
         f"Train history rebuilt: {len(train):,} rows, "
         f"{history_batches} batches, time={time.time() - history_start:.1f}s",
@@ -361,11 +529,20 @@ def main() -> None:
         "validation": evaluate(val_labels, val_scores),
         "test": evaluate(test_labels, test_scores),
         "training_seconds": time.time() - start_time,
+        "seed": args.seed,
         "feature_count": len(active_features),
         "neighbor_k": args.neighbor_k,
+        "max_history": max_history,
+        "batch_size": args.batch_size,
+        "epochs": args.epochs,
+        "lr": args.lr,
+        "model_parameters": model_parameters,
         "ablation": args.ablation,
         "negative_sampling_ratio": args.negative_ratio,
         "device": str(device),
+        "timestamp_unit": "seconds",
+        "timestamp_resolution_seconds": 1,
+        "timestamp_groups": timestamp_groups,
         "feature_scaling": "train_only_mean_std_clip_10",
     }
     (args.results_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")

@@ -1,12 +1,14 @@
 {
   "model": {
-    "transaction_dim": 27,
-    "event_dim": 27,
+    "transaction_dim": 26,
+    "event_dim": 26,
     "hidden_dim": 32,
     "time_dim": 16,
     "num_heads": 2,
+    "num_layers": 2,
     "dropout": 0.2,
-    "neighbor_k": 10
+    "neighbor_k": 10,
+    "max_history": 10
   },
   "training": {
     "epochs": 3,
@@ -18,11 +20,12 @@
     "threshold": 0.5
   },
   "data": {
-    "directory": "data/processed/temporal_gnn",
+    "directory": "data/processed/temporal_gnn_v2_1s",
+    "timestamp_resolution_seconds": 1,
     "train": "train.csv",
     "validation": "validation.csv",
     "test": "test.csv",
     "future": "future.csv"
   },
-  "results": "results/tgat"
+  "results": "results/research_validation/corrected_tgat"
 }

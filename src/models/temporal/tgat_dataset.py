@@ -22,8 +22,26 @@ TEMPORAL_FEATURES = [
     "receiver_in_count", "receiver_out_count", "receiver_total_count", "receiver_in_amount",
     "receiver_out_amount", "receiver_avg_in_amount", "receiver_time_since_last",
 ]
+# `receiver_avg_out_amount` is present in temporal_gnn/*.csv (27 features) and
+# used by Temporal XGBoost, but excluded from the 26-feature TGAT contract.
+OMITTED_CSV_TEMPORAL_FEATURES = ["receiver_avg_out_amount"]
 ALL_FEATURES = CURRENT_FEATURES + TEMPORAL_FEATURES
+FEATURE_DIM = len(ALL_FEATURES)
 TARGET = "Is Laundering"
+
+
+def to_unix_seconds(values: pd.Series | pd.DatetimeIndex) -> pd.Series:
+    """Convert parsed datetime values explicitly to 1-second Unix epoch integers.
+
+    Under pandas 3.x parsed timestamps default to ``datetime64[us]`` rather than
+    ``datetime64[ns]``, so dividing raw ``int64`` values by ``10**9`` collapses
+    timestamps into 1,000-second buckets. Converting via ``as_unit('s')`` preserves
+    exact 1-second resolution independent of the underlying datetime unit.
+    """
+    series = pd.Series(values) if isinstance(values, pd.DatetimeIndex) else values
+    if series.isna().any():
+        raise ValueError("Cannot convert NaT timestamps to Unix seconds")
+    return series.dt.as_unit("s").astype("int64")
 
 
 @dataclass
@@ -77,6 +95,77 @@ def _pad_history(events: Iterable[tuple[int, np.ndarray]], k: int, feature_dim: 
             raise ValueError("Temporal sampler returned a non-historical event")
         delta_array[index] = float(delta)
     return feature_array, delta_array
+
+
+def build_batch_from_arrays(
+    senders: np.ndarray | list[str] | None,
+    receivers: np.ndarray | list[str] | None,
+    timestamps_arr: np.ndarray,
+    feature_matrix: np.ndarray,
+    labels_arr: np.ndarray,
+    store: EventFeatureStore,
+    neighbor_k: int = 10,
+    feature_scaler=None,
+    use_neighbors: bool = True,
+    sender_ids: np.ndarray | list[int] | None = None,
+    receiver_ids: np.ndarray | list[int] | None = None,
+) -> TemporalBatch:
+    """Build a causal TemporalBatch from pre-extracted arrays."""
+    batch_len = len(timestamps_arr)
+    feature_dim = feature_matrix.shape[1]
+
+    if feature_scaler is not None:
+        tx_out = feature_scaler.transform_array(feature_matrix).astype(np.float32, copy=False)
+    else:
+        tx_out = np.asarray(feature_matrix, dtype=np.float32)
+
+    sender_buf = np.zeros((batch_len, neighbor_k + 1, feature_dim), dtype=np.float32)
+    receiver_buf = np.zeros((batch_len, neighbor_k + 1, feature_dim), dtype=np.float32)
+    sender_delta_buf = np.zeros((batch_len, neighbor_k), dtype=np.float32)
+    receiver_delta_buf = np.zeros((batch_len, neighbor_k), dtype=np.float32)
+
+    if use_neighbors:
+        get_id = store.get_id
+        recent_events = store.store.recent_events
+        ts_list = timestamps_arr.tolist() if isinstance(timestamps_arr, np.ndarray) else timestamps_arr
+        if sender_ids is not None and receiver_ids is not None:
+            s_id_iter = sender_ids.tolist() if isinstance(sender_ids, np.ndarray) else sender_ids
+            r_id_iter = receiver_ids.tolist() if isinstance(receiver_ids, np.ndarray) else receiver_ids
+        else:
+            s_id_iter = [get_id(str(senders[row_idx])) for row_idx in range(batch_len)]
+            r_id_iter = [get_id(str(receivers[row_idx])) for row_idx in range(batch_len)]
+
+        for row_idx in range(batch_len):
+            timestamp = int(ts_list[row_idx])
+            s_events = recent_events(int(s_id_iter[row_idx]), timestamp, neighbor_k)
+            for j, ev in enumerate(s_events):
+                if j >= neighbor_k:
+                    break
+                delta = timestamp - ev.timestamp
+                if delta <= 0:
+                    raise ValueError("Temporal sampler returned a non-historical event")
+                sender_buf[row_idx, j + 1] = ev.features
+                sender_delta_buf[row_idx, j] = float(delta)
+
+            r_events = recent_events(int(r_id_iter[row_idx]), timestamp, neighbor_k)
+            for j, ev in enumerate(r_events):
+                if j >= neighbor_k:
+                    break
+                delta = timestamp - ev.timestamp
+                if delta <= 0:
+                    raise ValueError("Temporal sampler returned a non-historical event")
+                receiver_buf[row_idx, j + 1] = ev.features
+                receiver_delta_buf[row_idx, j] = float(delta)
+
+    return TemporalBatch(
+        transaction_features=torch.from_numpy(np.ascontiguousarray(tx_out.copy())),
+        sender_features=torch.from_numpy(sender_buf),
+        sender_delta_seconds=torch.from_numpy(sender_delta_buf),
+        receiver_features=torch.from_numpy(receiver_buf),
+        receiver_delta_seconds=torch.from_numpy(receiver_delta_buf),
+        labels=torch.from_numpy(np.ascontiguousarray(np.asarray(labels_arr, dtype=np.float32).copy())),
+        timestamps=torch.from_numpy(np.ascontiguousarray(np.asarray(timestamps_arr, dtype=np.int64).copy())),
+    )
 
 
 def build_batch(frame: pd.DataFrame, store: EventFeatureStore, neighbor_k: int = 10, feature_scaler=None, active_features: list[str] | None = None, use_neighbors: bool = True) -> TemporalBatch:

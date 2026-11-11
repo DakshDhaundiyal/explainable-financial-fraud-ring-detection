@@ -119,8 +119,8 @@ class TGATTransactionModel(nn.Module):
 
     def __init__(
         self,
-        transaction_dim: int = 27,
-        event_dim: int = 27,
+        transaction_dim: int = 26,
+        event_dim: int = 26,
         hidden_dim: int = 32,
         time_dim: int = 16,
         num_heads: int = 2,

@@ -67,7 +67,7 @@ def build_temporal_features(
     # Process one exact timestamp at a time.
     for timestamp, group in df.groupby("Timestamp", sort=True):
 
-        timestamp_seconds = int(timestamp.timestamp())
+        timestamp_seconds = int((timestamp - pd.Timestamp("1970-01-01")) // pd.Timedelta(seconds=1))
 
         current_rows = []
 

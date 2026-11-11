@@ -18,7 +18,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 
 from src.models.temporal.feature_scaler import TemporalFeatureScaler
 from src.models.temporal.tgat_core import TGATTransactionModel
-from src.models.temporal.tgat_dataset import ALL_FEATURES, EventFeatureStore, build_batch
+from src.models.temporal.tgat_dataset import ALL_FEATURES, EventFeatureStore, build_batch, to_unix_seconds
 
 DATA_DIR = Path("data/processed/temporal_gnn")
 
@@ -29,7 +29,8 @@ def seed_everything(seed: int) -> None:
 
 def read_frame(path: Path, max_rows: int) -> pd.DataFrame:
     frame = pd.read_csv(path, nrows=max_rows)
-    frame["_timestamp"] = pd.to_datetime(frame["Timestamp"], errors="raise").astype("int64") // 1_000_000_000
+    parsed = pd.to_datetime(frame["Timestamp"], format="mixed", errors="raise")
+    frame["_timestamp"] = to_unix_seconds(parsed)
     return frame.sort_values("_timestamp", kind="stable").reset_index(drop=True)
 
 
@@ -55,7 +56,11 @@ def make_batches(frame, store, batch_size, neighbor_k):
                 end += 1
         chunk = frame.iloc[start:end].copy()
         yield build_batch(chunk, store, neighbor_k)
-        for _, row in chunk.iterrows(): store.add_row(row, int(row["_timestamp"]))
+        idx = {name: pos for pos, name in enumerate(chunk.columns)}
+        feature_indices = (idx["From Account"], idx["To Account"], *(idx[name] for name in ALL_FEATURES))
+        timestamp_index = idx["_timestamp"]
+        for row in chunk.itertuples(index=False, name=None):
+            store.add_row(row, int(row[timestamp_index]), feature_indices)
         start = end
 
 

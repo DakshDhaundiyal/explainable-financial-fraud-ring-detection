@@ -4,16 +4,19 @@ from __future__ import annotations
 from bisect import bisect_left
 from collections import defaultdict, deque
 from dataclasses import dataclass
+from functools import partial
 from typing import Iterable
 
+import numpy as np
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, slots=True)
 class TemporalEvent:
     """One historical account interaction."""
     timestamp: int
     source: int
     destination: int
-    features: tuple[float, ...]
+    features: tuple[float, ...] | np.ndarray
 
 
 class TemporalNeighborStore:
@@ -29,10 +32,11 @@ class TemporalNeighborStore:
         if max_history_per_node <= 0:
             raise ValueError("max_history_per_node must be positive")
         self.max_history_per_node = max_history_per_node
-        self._incoming: dict[int, deque[TemporalEvent]] = defaultdict(deque)
-        self._outgoing: dict[int, deque[TemporalEvent]] = defaultdict(deque)
-        self._incoming_timestamps: dict[int, deque[int]] = defaultdict(deque)
-        self._outgoing_timestamps: dict[int, deque[int]] = defaultdict(deque)
+        bounded_deque = partial(deque, maxlen=max_history_per_node)
+        self._incoming: dict[int, deque[TemporalEvent]] = defaultdict(bounded_deque)
+        self._outgoing: dict[int, deque[TemporalEvent]] = defaultdict(bounded_deque)
+        self._incoming_timestamps: dict[int, deque[int]] = defaultdict(bounded_deque)
+        self._outgoing_timestamps: dict[int, deque[int]] = defaultdict(bounded_deque)
 
     def add_event(
         self,
@@ -41,28 +45,24 @@ class TemporalNeighborStore:
         destination: int,
         features: Iterable[float],
     ) -> None:
+        if isinstance(features, np.ndarray) and features.dtype == np.float32 and features.ndim == 1:
+            stored_features: tuple[float, ...] | np.ndarray = features
+        else:
+            stored_features = tuple(float(v) for v in features)
+
+        ts_int = int(timestamp)
+        src_int = int(source)
+        dst_int = int(destination)
         event = TemporalEvent(
-            timestamp=int(timestamp),
-            source=int(source),
-            destination=int(destination),
-            features=tuple(float(v) for v in features),
+            timestamp=ts_int,
+            source=src_int,
+            destination=dst_int,
+            features=stored_features,
         )
-        outgoing = self._outgoing[event.source]
-        outgoing_timestamps = self._outgoing_timestamps[event.source]
-        incoming = self._incoming[event.destination]
-        incoming_timestamps = self._incoming_timestamps[event.destination]
-
-        outgoing.append(event)
-        outgoing_timestamps.append(event.timestamp)
-        incoming.append(event)
-        incoming_timestamps.append(event.timestamp)
-
-        while len(outgoing) > self.max_history_per_node:
-            outgoing.popleft()
-            outgoing_timestamps.popleft()
-        while len(incoming) > self.max_history_per_node:
-            incoming.popleft()
-            incoming_timestamps.popleft()
+        self._outgoing[src_int].append(event)
+        self._outgoing_timestamps[src_int].append(ts_int)
+        self._incoming[dst_int].append(event)
+        self._incoming_timestamps[dst_int].append(ts_int)
 
     @staticmethod
     def _recent_before(
@@ -83,7 +83,7 @@ class TemporalNeighborStore:
         if eligible_end <= 0:
             return []
         start = max(0, eligible_end - int(limit))
-        return list(history)[start:eligible_end][::-1]
+        return [history[idx] for idx in range(eligible_end - 1, start - 1, -1)]
 
     def get_history(
         self,
@@ -95,17 +95,31 @@ class TemporalNeighborStore:
         if limit <= 0:
             raise ValueError("limit must be positive")
         node_id = int(node_id)
-        outgoing = self._recent_before(
-            self._outgoing.get(node_id, deque()),
-            self._outgoing_timestamps.get(node_id, deque()),
-            int(query_timestamp),
-            int(limit),
+        ts_query = int(query_timestamp)
+        limit_int = int(limit)
+
+        out_hist = self._outgoing.get(node_id)
+        outgoing = (
+            self._recent_before(
+                out_hist,
+                self._outgoing_timestamps[node_id],
+                ts_query,
+                limit_int,
+            )
+            if out_hist
+            else []
         )
-        incoming = self._recent_before(
-            self._incoming.get(node_id, deque()),
-            self._incoming_timestamps.get(node_id, deque()),
-            int(query_timestamp),
-            int(limit),
+
+        in_hist = self._incoming.get(node_id)
+        incoming = (
+            self._recent_before(
+                in_hist,
+                self._incoming_timestamps[node_id],
+                ts_query,
+                limit_int,
+            )
+            if in_hist
+            else []
         )
         return outgoing, incoming
 
@@ -117,6 +131,10 @@ class TemporalNeighborStore:
     ) -> list[TemporalEvent]:
         """Return a merged recent temporal neighborhood strictly before T."""
         outgoing, incoming = self.get_history(node_id, query_timestamp, limit)
+        if not incoming:
+            return outgoing[:limit]
+        if not outgoing:
+            return incoming[:limit]
         events = outgoing + incoming
         events.sort(key=lambda item: item.timestamp, reverse=True)
         return events[:limit]

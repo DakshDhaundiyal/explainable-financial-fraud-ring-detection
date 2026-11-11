@@ -27,9 +27,11 @@ def main() -> None:
     parser.add_argument("--threshold-file", type=Path, default=Path("results/threshold_analysis/frozen_threshold.json"))
     parser.add_argument("--results-dir", type=Path, default=Path("results/generalization"))
     parser.add_argument("--neighbor-k", type=int, default=10)
+    parser.add_argument("--max-history", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=256)
     args = parser.parse_args()
 
+    max_history = args.max_history if args.max_history is not None else args.neighbor_k
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train = read_frame(args.data_dir / "train.csv")
     validation = read_frame(args.data_dir / "validation.csv")
@@ -54,11 +56,11 @@ def main() -> None:
         hidden_dim=32, time_dim=16, num_heads=2, dropout=0.2,
         num_layers=2, use_time_encoding=True,
     ).to(device)
-    state = torch.load(args.checkpoint, map_location=device)
+    state = torch.load(args.checkpoint, map_location=device, weights_only=True)
     model.load_state_dict(state)
     model.eval()
 
-    store = EventFeatureStore(max_history=args.neighbor_k)
+    store = EventFeatureStore(max_history=max_history)
     populate_history(train, store, args.batch_size, list(ALL_FEATURES))
     # Advance state through earlier evaluation periods without using their labels
     # for any model or threshold decision.

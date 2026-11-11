@@ -9,8 +9,12 @@ def main() -> None:
     torch.manual_seed(42)
     batch_size = 4
     neighbors = 5
-    transaction_dim = 27
-    event_dim = 27
+    transaction_dim = 26
+    event_dim = 26
+
+    default_model = TGATTransactionModel()
+    assert default_model.transaction_dim == 26
+    assert default_model.event_dim == 26
 
     model = TGATTransactionModel(
         transaction_dim=transaction_dim,
