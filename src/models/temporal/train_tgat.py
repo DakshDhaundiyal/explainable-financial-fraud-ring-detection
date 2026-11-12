@@ -8,6 +8,7 @@ test continue the history from earlier splits and never update model weights.
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import random
 import time
@@ -540,9 +541,20 @@ def main() -> None:
     print("Fitting train-only feature scaler...", flush=True)
     scaler = TemporalFeatureScaler.fit(train)
     train = scaler.transform_frame(train)
+    gc.collect()
     validation = scaler.transform_frame(validation)
     if test is not None:
         test = scaler.transform_frame(test)
+    keep_cols = {"From Account", "To Account", "_timestamp", TARGET, *active_features}
+    for frame_ref in (train, validation, test):
+        if frame_ref is not None:
+            drop_cols = [c for c in frame_ref.columns if c not in keep_cols]
+            if drop_cols:
+                frame_ref.drop(columns=drop_cols, inplace=True)
+            for col in active_features:
+                if frame_ref[col].dtype != np.float32:
+                    frame_ref[col] = frame_ref[col].astype(np.float32, copy=False)
+    gc.collect()
     print("Feature scaling: train-only mean/std, clipped to [-10, 10]", flush=True)
 
     model = TGATTransactionModel(
