@@ -1,0 +1,35 @@
+{
+  "model": {
+    "transaction_dim": 26,
+    "event_dim": 26,
+    "hidden_dim": 32,
+    "time_dim": 16,
+    "num_heads": 2,
+    "num_layers": 2,
+    "dropout": 0.2,
+    "neighbor_k": 10,
+    "max_history": 10,
+    "time_encoding_mode": "log1p_seconds",
+    "time_max_period": 86400.0
+  },
+  "training": {
+    "epochs": 3,
+    "batch_size": 256,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "grad_clip_norm": 5.0,
+    "negative_sampling_ratio": 20,
+    "seeds": [42, 43, 44],
+    "threshold": 0.5
+  },
+  "data": {
+    "directory": "data/processed/temporal_gnn_v2_1s",
+    "timestamp_resolution_seconds": 1,
+    "train": "train.csv",
+    "validation": "validation.csv",
+    "test": "test.csv",
+    "future": "future.csv"
+  },
+  "results": "results/research_validation_v3"
+}
+

@@ -15,7 +15,7 @@ import torch
 
 from src.models.common.evaluation import classification_metrics
 from src.models.temporal.feature_scaler import TemporalFeatureScaler
-from src.models.temporal.tgat_core import TGATTransactionModel
+from src.models.temporal.tgat_core import TGATTransactionModel, VALID_TIME_ENCODING_MODES
 from src.models.temporal.tgat_dataset import ALL_FEATURES, CURRENT_FEATURES, EventFeatureStore
 from src.models.temporal.train_tgat import populate_history, predict, read_frame
 
@@ -29,7 +29,18 @@ def main() -> None:
     parser.add_argument("--neighbor-k", type=int, default=10)
     parser.add_argument("--max-history", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--time-encoding-mode", choices=list(VALID_TIME_ENCODING_MODES), default=None)
+    parser.add_argument("--time-max-period", type=float, default=None)
     args = parser.parse_args()
+
+    cfg_path = args.checkpoint.parent / "config.json"
+    ckpt_cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
+    time_encoding_mode = args.time_encoding_mode or ckpt_cfg.get("time_encoding_mode", "raw_seconds")
+    time_max_period = (
+        args.time_max_period
+        if args.time_max_period is not None
+        else float(ckpt_cfg.get("time_max_period", 86_400.0))
+    )
 
     max_history = args.max_history if args.max_history is not None else args.neighbor_k
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,6 +66,8 @@ def main() -> None:
         transaction_dim=len(ALL_FEATURES), event_dim=len(ALL_FEATURES),
         hidden_dim=32, time_dim=16, num_heads=2, dropout=0.2,
         num_layers=2, use_time_encoding=True,
+        time_encoding_mode=time_encoding_mode,
+        max_period=time_max_period,
     ).to(device)
     state = torch.load(args.checkpoint, map_location=device, weights_only=True)
     model.load_state_dict(state)
@@ -113,6 +126,8 @@ def main() -> None:
         "checkpoint": str(args.checkpoint),
         "threshold_file": str(args.threshold_file),
         "threshold": threshold,
+        "time_encoding_mode": time_encoding_mode,
+        "time_max_period": time_max_period,
         "scaler": "fit on train only",
         "history_order": ["train", "validation", "test", "future"],
         "future_rows": len(future),

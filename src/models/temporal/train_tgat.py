@@ -20,7 +20,7 @@ from sklearn.metrics import average_precision_score
 
 from src.models.common.evaluation import classification_metrics
 from src.models.temporal.feature_scaler import TemporalFeatureScaler
-from src.models.temporal.tgat_core import TGATTransactionModel
+from src.models.temporal.tgat_core import TGATTransactionModel, VALID_TIME_ENCODING_MODES
 from src.models.temporal.tgat_dataset import (
     ALL_FEATURES,
     CURRENT_FEATURES,
@@ -43,8 +43,18 @@ def seed_everything(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def read_frame(path: Path, rows: int | None = None) -> pd.DataFrame:
-    frame = pd.read_csv(path, nrows=rows)
+def read_frame(path: Path, rows: int | None = None, tail_rows: int | None = None) -> pd.DataFrame:
+    if tail_rows is not None and rows is not None:
+        raise ValueError("Specify at most one of rows or tail_rows")
+    if tail_rows is not None:
+        with open(path, "rb") as f:
+            total_lines = sum(1 for _ in f)
+        data_rows = max(0, total_lines - 1)
+        skip_count = max(0, data_rows - int(tail_rows))
+        skiprows = range(1, skip_count + 1) if skip_count > 0 else None
+        frame = pd.read_csv(path, skiprows=skiprows)
+    else:
+        frame = pd.read_csv(path, nrows=rows)
     parsed = pd.to_datetime(frame["Timestamp"], format="mixed", errors="raise")
     frame["_timestamp"] = to_unix_seconds(parsed)
     frame = frame.sort_values("_timestamp", kind="stable").reset_index(drop=True)
@@ -234,9 +244,101 @@ def populate_history(frame: pd.DataFrame, store: EventFeatureStore, batch_size: 
     return batches
 
 
-def train_epoch(model, frame, store, optimizer, criterion, batch_size, neighbor_k, negative_ratio, device, active_features=None, use_neighbors=True):
+def _summarize_grad_norms(norms: list[torch.Tensor], clip_limit: float) -> dict[str, float | int]:
+    """Summarize asynchronous device-side step gradient norms on epoch completion."""
+    if not norms:
+        return {
+            "count": 0,
+            "mean": 0.0,
+            "std": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0,
+            "clip_count": 0,
+            "clip_fraction": 0.0,
+            "non_finite_count": 0,
+        }
+    stacked = torch.stack(norms).detach().cpu().numpy().astype(np.float64)
+    finite_mask = np.isfinite(stacked)
+    non_finite_count = int((~finite_mask).sum())
+    valid = stacked[finite_mask]
+    if len(valid) == 0:
+        return {
+            "count": int(len(stacked)),
+            "mean": float("nan"),
+            "std": float("nan"),
+            "p50": float("nan"),
+            "p95": float("nan"),
+            "p99": float("nan"),
+            "max": float("nan"),
+            "clip_count": int(len(stacked)),
+            "clip_fraction": 1.0,
+            "non_finite_count": non_finite_count,
+        }
+    clipped = valid > clip_limit
+    clip_count = int(clipped.sum()) + non_finite_count
+    return {
+        "count": int(len(stacked)),
+        "mean": float(valid.mean()),
+        "std": float(valid.std(ddof=1)) if len(valid) > 1 else 0.0,
+        "p50": float(np.quantile(valid, 0.50)),
+        "p95": float(np.quantile(valid, 0.95)),
+        "p99": float(np.quantile(valid, 0.99)),
+        "max": float(valid.max()),
+        "clip_count": clip_count,
+        "clip_fraction": float(clip_count / len(stacked)),
+        "non_finite_count": non_finite_count,
+    }
+
+
+def _score_summary(labels: np.ndarray, scores: np.ndarray) -> dict:
+    labels = np.asarray(labels, dtype=np.int64)
+    scores = np.asarray(scores, dtype=np.float64)
+    pos = scores[labels == 1]
+    neg = scores[labels == 0]
+    def _q(arr: np.ndarray) -> dict[str, float | int]:
+        if len(arr) == 0:
+            return {"count": 0}
+        return {
+            "count": int(len(arr)),
+            "min": float(arr.min()),
+            "median": float(np.quantile(arr, 0.50)),
+            "p90": float(np.quantile(arr, 0.90)),
+            "p95": float(np.quantile(arr, 0.95)),
+            "p99": float(np.quantile(arr, 0.99)),
+            "p999": float(np.quantile(arr, 0.999)),
+            "max": float(arr.max()),
+        }
+    pos_max = float(pos.max()) if len(pos) else 0.0
+    return {
+        "pos": _q(pos),
+        "neg": _q(neg),
+        "neg_strictly_above_pos_max": int((neg > pos_max).sum()) if len(pos) else 0,
+    }
+
+
+def train_epoch(
+    model,
+    frame,
+    store,
+    optimizer,
+    criterion,
+    batch_size,
+    neighbor_k,
+    negative_ratio,
+    device,
+    active_features=None,
+    use_neighbors=True,
+    grad_clip_norm: float = 5.0,
+    grad_stats_out: dict | None = None,
+):
     model.train()
     total_loss_t = torch.zeros((), dtype=torch.float64, device=device)
+    zero_scalar = torch.zeros((), dtype=torch.float32, device=device)
+    pre_clip_grad_norms: list[torch.Tensor] = []
+    te_grad_norms: list[torch.Tensor] = []
+    freq_grad_norms: list[torch.Tensor] = []
     used = 0
     positives = 0
     negatives = 0
@@ -297,7 +399,26 @@ def train_epoch(model, frame, store, optimizer, criterion, batch_size, neighbor_
             logits, _ = model(transaction, sender, sender_delta, receiver, receiver_delta)
             loss = criterion(logits, y)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+            if grad_stats_out is not None:
+                te_grads = [
+                    p.grad.detach()
+                    for p in model.time_encoder.parameters()
+                    if p.grad is not None
+                ]
+                if te_grads:
+                    te_norm = torch.linalg.vector_norm(
+                        torch.cat([g.reshape(-1) for g in te_grads])
+                    )
+                else:
+                    te_norm = zero_scalar
+                te_grad_norms.append(te_norm)
+                f_grad = model.time_encoder.frequency.grad
+                freq_grad_norms.append(
+                    torch.linalg.vector_norm(f_grad.detach()) if f_grad is not None else zero_scalar
+                )
+            total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
+            if grad_stats_out is not None:
+                pre_clip_grad_norms.append(total_norm.detach())
             optimizer.step()
 
             batch_count = len(keep)
@@ -315,6 +436,12 @@ def train_epoch(model, frame, store, optimizer, criterion, batch_size, neighbor_
                 sender_ids, receiver_ids, ts_list, feature_matrix, start, group_end, store
             )
         start = group_end
+
+    if grad_stats_out is not None:
+        grad_stats_out.clear()
+        grad_stats_out["pre_clip_grad_norm"] = _summarize_grad_norms(pre_clip_grad_norms, grad_clip_norm)
+        grad_stats_out["time_encoder_grad_norm"] = _summarize_grad_norms(te_grad_norms, grad_clip_norm)
+        grad_stats_out["time_frequency_grad_norm"] = _summarize_grad_norms(freq_grad_norms, grad_clip_norm)
 
     return float(total_loss_t.item()) / max(used, 1), positives, negatives, total_batches
 
@@ -361,8 +488,10 @@ def main() -> None:
     parser.add_argument("--negative-ratio", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--max-train-rows", type=int, default=None)
+    parser.add_argument("--tail-train-rows", type=int, default=None)
     parser.add_argument("--max-validation-rows", type=int, default=None)
     parser.add_argument("--max-test-rows", type=int, default=None)
+    parser.add_argument("--skip-test", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--ablation", choices=["none","no_temporal_features","no_neighbors","no_time_encoding"], default="none")
     parser.add_argument("--max-history", type=int, default=None)
@@ -371,6 +500,13 @@ def main() -> None:
     parser.add_argument("--num-layers", type=int, choices=[1,2], default=2)
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--time-encoding-mode",
+        choices=list(VALID_TIME_ENCODING_MODES),
+        default="raw_seconds",
+    )
+    parser.add_argument("--time-max-period", type=float, default=86_400.0)
+    parser.add_argument("--grad-clip-norm", type=float, default=5.0)
     args = parser.parse_args()
 
     if args.ablation == "no_temporal_features":
@@ -384,13 +520,14 @@ def main() -> None:
     seed_everything(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_rows = 5000 if args.smoke else args.max_train_rows
+    tail_train_rows = None if args.smoke else args.tail_train_rows
     val_rows = 2000 if args.smoke else args.max_validation_rows
     test_rows = 2000 if args.smoke else args.max_test_rows
 
-    train = read_frame(args.data_dir / "train.csv", train_rows)
+    train = read_frame(args.data_dir / "train.csv", train_rows, tail_rows=tail_train_rows)
     validation = read_frame(args.data_dir / "validation.csv", val_rows)
-    test = read_frame(args.data_dir / "test.csv", test_rows)
-    if len(train) == 0 or len(validation) == 0 or len(test) == 0:
+    test = None if args.skip_test else read_frame(args.data_dir / "test.csv", test_rows)
+    if len(train) == 0 or len(validation) == 0 or (test is not None and len(test) == 0):
         raise RuntimeError("TGAT input split is empty")
     if list(train[ALL_FEATURES].columns) != ALL_FEATURES:
         raise RuntimeError("TGAT feature contract mismatch")
@@ -404,7 +541,8 @@ def main() -> None:
     scaler = TemporalFeatureScaler.fit(train)
     train = scaler.transform_frame(train)
     validation = scaler.transform_frame(validation)
-    test = scaler.transform_frame(test)
+    if test is not None:
+        test = scaler.transform_frame(test)
     print("Feature scaling: train-only mean/std, clipped to [-10, 10]", flush=True)
 
     model = TGATTransactionModel(
@@ -416,6 +554,8 @@ def main() -> None:
         dropout=args.dropout,
         num_layers=args.num_layers,
         use_time_encoding=use_time_encoding,
+        time_encoding_mode=args.time_encoding_mode,
+        max_period=args.time_max_period,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     criterion = torch.nn.BCEWithLogitsLoss()
@@ -437,7 +577,7 @@ def main() -> None:
     timestamp_groups = {
         "train": int(train["_timestamp"].nunique()),
         "validation": int(validation["_timestamp"].nunique()),
-        "test": int(test["_timestamp"].nunique()),
+        "test": int(test["_timestamp"].nunique()) if test is not None else 0,
     }
     config = vars(args).copy()
     config.update({
@@ -448,6 +588,9 @@ def main() -> None:
         "ablation": args.ablation,
         "use_neighbors": use_neighbors,
         "use_time_encoding": use_time_encoding,
+        "time_encoding_mode": args.time_encoding_mode,
+        "time_max_period": args.time_max_period,
+        "grad_clip_norm": args.grad_clip_norm,
         "max_history": max_history,
         "hidden_dim": args.hidden_dim,
         "num_heads": args.num_heads,
@@ -464,6 +607,7 @@ def main() -> None:
     (args.results_dir / "config.json").write_text(json.dumps(config, indent=2, default=str), encoding="utf-8")
 
     best_val = -np.inf
+    best_epoch = 0
     best_state = None
     log = []
     start_time = time.time()
@@ -471,15 +615,24 @@ def main() -> None:
         store = EventFeatureStore(max_history=max_history)
         epoch_start = time.time()
         print(f"\nEpoch {epoch}/{args.epochs} - training...", flush=True)
+        grad_stats: dict = {}
         loss, positives, negatives, batches = train_epoch(
             model, train, store, optimizer, criterion,
-            args.batch_size, args.neighbor_k, args.negative_ratio, device, active_features, use_neighbors,
+            args.batch_size, args.neighbor_k, args.negative_ratio, device,
+            active_features, use_neighbors,
+            grad_clip_norm=args.grad_clip_norm,
+            grad_stats_out=grad_stats,
         )
         print(f"Epoch {epoch}/{args.epochs} - validating...", flush=True)
         val_labels, val_scores, _ = predict(
             model, validation, store, args.batch_size, args.neighbor_k, device, active_features, use_neighbors
         )
         val_pr = average_precision_score(val_labels, val_scores)
+        with torch.no_grad():
+            freq_np = model.time_encoder.frequency.detach().cpu().numpy().astype(np.float64)
+            phase_np = model.time_encoder.phase.detach().cpu().numpy().astype(np.float64)
+        g_stats = grad_stats["pre_clip_grad_norm"]
+        te_stats = grad_stats["time_encoder_grad_norm"]
         row = {
             "epoch": epoch,
             "loss": loss,
@@ -488,15 +641,30 @@ def main() -> None:
             "train_batches": batches,
             "validation_pr_auc": float(val_pr),
             "seconds": time.time() - epoch_start,
+            "pre_clip_grad_norm": g_stats,
+            "time_encoder_grad_norm": te_stats,
+            "time_frequency_grad_norm": grad_stats["time_frequency_grad_norm"],
+            "time_encoder_state": {
+                "frequency_min": float(freq_np.min()),
+                "frequency_max": float(freq_np.max()),
+                "frequency_l2": float(np.linalg.norm(freq_np)),
+                "phase_l2": float(np.linalg.norm(phase_np)),
+                "frequency_values": freq_np.tolist(),
+                "phase_values": phase_np.tolist(),
+            },
         }
         log.append(row)
         print(
             f"Epoch {epoch}/{args.epochs}: loss={loss:.6f}, "
-            f"val_pr_auc={val_pr:.6f}, batches={batches}, time={row['seconds']:.1f}s",
+            f"val_pr_auc={val_pr:.6f}, grad_mean={g_stats['mean']:.3f}, "
+            f"grad_p95={g_stats['p95']:.3f}, grad_max={g_stats['max']:.3f}, "
+            f"clip_frac={g_stats['clip_fraction']*100:.2f}%, "
+            f"te_grad_mean={te_stats['mean']:.3f}, time={row['seconds']:.1f}s",
             flush=True,
         )
         if val_pr > best_val:
             best_val = val_pr
+            best_epoch = epoch
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
     if best_state is None:
@@ -520,14 +688,39 @@ def main() -> None:
     val_labels, val_scores, val_ts = predict(
         model, validation, evaluation_store, args.batch_size, args.neighbor_k, device, active_features, use_neighbors
     )
-    print("Evaluating test...", flush=True)
-    test_labels, test_scores, test_ts = predict(
-        model, test, evaluation_store, args.batch_size, args.neighbor_k, device, active_features, use_neighbors
-    )
+    if test is not None:
+        print("Evaluating test...", flush=True)
+        test_labels, test_scores, test_ts = predict(
+            model, test, evaluation_store, args.batch_size, args.neighbor_k, device, active_features, use_neighbors
+        )
+        test_eval = evaluate(test_labels, test_scores)
+        test_summary = _score_summary(test_labels, test_scores)
+    else:
+        print("Skipping test split evaluation (--skip-test enabled).", flush=True)
+        test_labels = test_scores = test_ts = None
+        test_eval = None
+        test_summary = None
 
+    total_opt_steps = sum(int(r["pre_clip_grad_norm"]["count"]) for r in log)
+    total_clip_steps = sum(int(r["pre_clip_grad_norm"]["clip_count"]) for r in log)
     metrics = {
         "validation": evaluate(val_labels, val_scores),
-        "test": evaluate(test_labels, test_scores),
+        "test": test_eval,
+        "validation_score_summary": _score_summary(val_labels, val_scores),
+        "test_score_summary": test_summary,
+        "test_evaluated": test is not None,
+        "selected_epoch": best_epoch,
+        "best_validation_pr_auc": float(best_val),
+        "training_stability": {
+            "total_optimizer_steps": total_opt_steps,
+            "total_clipped_steps": total_clip_steps,
+            "overall_clip_fraction": float(total_clip_steps / total_opt_steps) if total_opt_steps else 0.0,
+            "epoch_losses": [float(r["loss"]) for r in log],
+            "epoch_grad_norm_means": [float(r["pre_clip_grad_norm"]["mean"]) for r in log],
+            "epoch_grad_norm_maxes": [float(r["pre_clip_grad_norm"]["max"]) for r in log],
+            "epoch_clip_fractions": [float(r["pre_clip_grad_norm"]["clip_fraction"]) for r in log],
+            "epoch_te_grad_norm_means": [float(r["time_encoder_grad_norm"]["mean"]) for r in log],
+        },
         "training_seconds": time.time() - start_time,
         "seed": args.seed,
         "feature_count": len(active_features),
@@ -536,6 +729,9 @@ def main() -> None:
         "batch_size": args.batch_size,
         "epochs": args.epochs,
         "lr": args.lr,
+        "grad_clip_norm": args.grad_clip_norm,
+        "time_encoding_mode": args.time_encoding_mode,
+        "time_max_period": args.time_max_period,
         "model_parameters": model_parameters,
         "ablation": args.ablation,
         "negative_sampling_ratio": args.negative_ratio,
@@ -549,9 +745,10 @@ def main() -> None:
     pd.DataFrame({"timestamp": val_ts, "label": val_labels, "score": val_scores}).to_csv(
         args.results_dir / "validation_predictions.csv", index=False
     )
-    pd.DataFrame({"timestamp": test_ts, "label": test_labels, "score": test_scores}).to_csv(
-        args.results_dir / "test_predictions.csv", index=False
-    )
+    if test_labels is not None:
+        pd.DataFrame({"timestamp": test_ts, "label": test_labels, "score": test_scores}).to_csv(
+            args.results_dir / "test_predictions.csv", index=False
+        )
     print("TGAT TRAINING PIPELINE: COMPLETED")
 
 

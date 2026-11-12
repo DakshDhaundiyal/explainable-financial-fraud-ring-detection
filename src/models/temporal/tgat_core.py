@@ -8,24 +8,60 @@ import torch
 from torch import Tensor, nn
 
 
+VALID_TIME_ENCODING_MODES = ("raw_seconds", "log1p_seconds", "hours", "days")
+
+
 class TimeEncoder(nn.Module):
     """Learnable cosine temporal encoding for non-negative time gaps."""
 
-    def __init__(self, dimension: int, max_period: float = 86_400.0) -> None:
+    def __init__(
+        self,
+        dimension: int,
+        max_period: float = 86_400.0,
+        time_encoding_mode: str = "raw_seconds",
+    ) -> None:
         super().__init__()
         if dimension <= 0:
             raise ValueError("dimension must be positive")
+        if max_period <= 0:
+            raise ValueError("max_period must be positive")
+        if time_encoding_mode not in VALID_TIME_ENCODING_MODES:
+            raise ValueError(
+                f"Unsupported time_encoding_mode '{time_encoding_mode}'. "
+                f"Expected one of {VALID_TIME_ENCODING_MODES}."
+            )
         self.dimension = dimension
+        self.max_period = float(max_period)
+        self.time_encoding_mode = str(time_encoding_mode)
         frequencies = torch.logspace(
-            math.log10(1.0 / max_period),
+            math.log10(1.0 / self.max_period),
             math.log10(1.0),
             dimension,
         )
         self.frequency = nn.Parameter(frequencies)
         self.phase = nn.Parameter(torch.zeros(dimension))
 
+    def scale_delta(self, delta_seconds: Tensor) -> Tensor:
+        """Transform raw non-negative seconds according to time_encoding_mode."""
+        delta = torch.nan_to_num(
+            delta_seconds.float(),
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        )
+        delta = torch.clamp(delta, min=0.0)
+        if self.time_encoding_mode == "raw_seconds":
+            return delta
+        if self.time_encoding_mode == "log1p_seconds":
+            return torch.log1p(delta)
+        if self.time_encoding_mode == "hours":
+            return delta / 3600.0
+        if self.time_encoding_mode == "days":
+            return delta / 86_400.0
+        raise ValueError(f"Unsupported time_encoding_mode: {self.time_encoding_mode}")
+
     def forward(self, delta_seconds: Tensor) -> Tensor:
-        delta = torch.clamp(delta_seconds.float(), min=0.0)
+        delta = self.scale_delta(delta_seconds)
         if delta.dim() == 1:
             delta = delta.unsqueeze(-1)
         return torch.cos(delta * self.frequency + self.phase)
@@ -127,6 +163,8 @@ class TGATTransactionModel(nn.Module):
         dropout: float = 0.2,
         num_layers: int = 2,
         use_time_encoding: bool = True,
+        time_encoding_mode: str = "raw_seconds",
+        max_period: float = 86_400.0,
     ) -> None:
         super().__init__()
         if num_layers not in (1, 2):
@@ -138,13 +176,19 @@ class TGATTransactionModel(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.use_time_encoding = use_time_encoding
+        self.time_encoding_mode = str(time_encoding_mode)
+        self.max_period = float(max_period)
 
         self.node_encoder = nn.Sequential(
             nn.Linear(event_dim, hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
-        self.time_encoder = TimeEncoder(time_dim)
+        self.time_encoder = TimeEncoder(
+            time_dim,
+            max_period=self.max_period,
+            time_encoding_mode=self.time_encoding_mode,
+        )
         self.attn1 = TemporalAttentionLayer(
             hidden_dim, time_dim, num_heads, dropout, use_time_encoding
         )
