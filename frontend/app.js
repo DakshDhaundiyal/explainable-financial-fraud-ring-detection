@@ -841,12 +841,19 @@ function updateGraphFilterUI() {
 
   const total = state.graphNodes.length;
   const matching = state.graphNodes.filter((n) => (n.max_risk_score || 0) >= val).length;
+  const networkTotal = state.totalNetworkNodes || total;
 
   const slider = document.getElementById('graph-risk-slider');
   if (slider) slider.value = val;
 
   if (badge) {
-    if (val === 0) {
+    if (networkTotal > total) {
+      if (val === 0) {
+        badge.textContent = `Showing top ${total} priority accounts (of ${networkTotal.toLocaleString()} in uploaded network)`;
+      } else {
+        badge.textContent = `Showing top ${matching} priority accounts (of ${networkTotal.toLocaleString()} in uploaded network · risk ≥ ${val.toFixed(2)})`;
+      }
+    } else if (val === 0) {
       badge.textContent = total > 0 ? `Showing all ${total} accounts (Blue, Yellow, Red)` : 'Showing all accounts';
     } else if (Math.abs(val - 0.20) < 0.03) {
       badge.textContent = `⚡ Fast-Load Active: Showing ${matching} of ${total} accounts (Yellow & Red only · click 'All' to show blue dots)`;
@@ -869,10 +876,24 @@ async function loadGraphTopology() {
     if (!res.ok) throw new Error('Graph query failed');
     const data = await res.json();
 
-    const rawNodes = data.nodes || [];
-    const rawEdges = data.edges || [];
+    state.totalNetworkNodes = data.total_nodes_count || 0;
+    state.displayedNetworkNodes = data.displayed_nodes_count || (data.nodes ? data.nodes.length : 0);
+
+    let rawNodes = data.nodes || [];
+    let rawEdges = data.edges || [];
 
     if (rawNodes.length === 0) return;
+
+    // Safety guard: cap interactive canvas nodes to top 450 to ensure 60 FPS rendering
+    if (rawNodes.length > 450) {
+      rawNodes = rawNodes.slice().sort((a, b) => {
+        const scoreB = (b.max_risk_score || 0);
+        const scoreA = (a.max_risk_score || 0);
+        return scoreB - scoreA;
+      }).slice(0, 450);
+      const keepIds = new Set(rawNodes.map((n) => n.id));
+      rawEdges = rawEdges.filter((e) => keepIds.has(e.source) && keepIds.has(e.target));
+    }
 
     const width = canvas.width;
     const height = canvas.height;
@@ -895,10 +916,19 @@ async function loadGraphTopology() {
 
     if (hubNode) {
       fraudRingNodeIds.add(hubNode.id);
+
+      // Fast O(E) pre-computation of hub neighbors instead of O(V*E) inner loop
+      const hubNeighborIds = new Set();
+      for (let i = 0; i < rawEdges.length; i++) {
+        const e = rawEdges[i];
+        if (e.source === hubNode.id) hubNeighborIds.add(e.target);
+        else if (e.target === hubNode.id) hubNeighborIds.add(e.source);
+      }
+
       rawNodes.forEach((n) => {
         if (n.id === hubNode.id) return;
         const isFlaggedOrRisk = n.is_flagged || (n.max_risk_score || 0) >= thresh;
-        const isConnectedToHub = rawEdges.some(e => (e.source === n.id && e.target === hubNode.id) || (e.source === hubNode.id && e.target === n.id));
+        const isConnectedToHub = hubNeighborIds.has(n.id);
         if (n.id === '809FB8870') {
           exitNode = n;
           fraudRingNodeIds.add(n.id);
@@ -1004,7 +1034,8 @@ async function loadGraphTopology() {
 
 function initMoneyParticles() {
   state.particles = [];
-  state.graphEdges.forEach((edge, idx) => {
+  const targetEdges = (state.graphEdges || []).slice(0, 150);
+  targetEdges.forEach((edge, idx) => {
     const isRisky = edge.is_flagged || edge.max_risk_score >= state.sessionThreshold;
     const count = isRisky ? 3 : 2;
     for (let i = 0; i < count; i++) {
@@ -1034,9 +1065,12 @@ function runBoundedForceSimulation() {
 
     // Node Repulsion & Collision Avoidance (applied among active nodes)
     const minFilter = state.minRiskFilter || 0;
-    const activeNodes = state.graphNodes.filter(
+    let activeNodes = state.graphNodes.filter(
       (n) => (n.max_risk_score || 0) >= minFilter || (state.selectedNode && state.selectedNode.id === n.id)
     );
+    if (activeNodes.length > 250) {
+      activeNodes = activeNodes.slice(0, 250);
+    }
 
     for (let i = 0; i < activeNodes.length; i++) {
       for (let j = i + 1; j < activeNodes.length; j++) {

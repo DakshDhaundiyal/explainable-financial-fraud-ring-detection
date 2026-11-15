@@ -436,6 +436,7 @@ class AnalysisStore:
         session_id: Optional[str] = None,
         min_score: Optional[float] = None,
         account_filter: Optional[str] = None,
+        max_nodes: int = 450,
     ) -> Dict[str, Any]:
         session = self.get_session(session_id)
         if not session:
@@ -443,6 +444,7 @@ class AnalysisStore:
 
         nodes = session.graph["nodes"]
         edges = session.graph["edges"]
+        total_raw_nodes = len(nodes)
 
         if min_score is not None:
             edges = [e for e in edges if e["max_risk_score"] >= min_score]
@@ -461,7 +463,29 @@ class AnalysisStore:
                 active_node_ids.add(e["target"])
             nodes = [n for n in nodes if n["id"] in active_node_ids]
 
-        return {"nodes": nodes, "edges": edges}
+        # For large networks (e.g. 10k or 200k nodes), prioritize high-risk fraud rings
+        # and interconnected hubs so the browser canvas renders instantly at 60 FPS.
+        if len(nodes) > max_nodes:
+            priority_nodes = sorted(
+                nodes,
+                key=lambda n: (
+                    1 if n.get("risk_level") == "High Risk" else (0.5 if n.get("risk_level") == "Medium Risk" else 0),
+                    n.get("max_risk_score", 0.0),
+                    n.get("in_degree", 0) + n.get("out_degree", 0)
+                ),
+                reverse=True
+            )[:max_nodes]
+
+            priority_ids = {n["id"] for n in priority_nodes}
+            edges = [e for e in edges if e["source"] in priority_ids and e["target"] in priority_ids]
+            nodes = priority_nodes
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "total_nodes_count": total_raw_nodes,
+            "displayed_nodes_count": len(nodes),
+        }
 
     def get_transaction(self, session_id: Optional[str], tx_id: str) -> Optional[Dict[str, Any]]:
         session = self.get_session(session_id)
