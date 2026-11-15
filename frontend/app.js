@@ -16,6 +16,7 @@ const state = {
   isPaused: false,
   minRiskFilter: 0.20, // Fast-load: default to Yellow & Red accounts (risk >= 0.20) to prevent browser UI lag
   demoBatchSize: 'elliptic', // Default to Elliptic++ Bitcoin dataset
+  isGraphFocused: false, // Large focus mode on graph rectangle
   
   // Graph Canvas & Simulation
   graphNodes: [],
@@ -472,6 +473,11 @@ function initGraphCanvas() {
 
   const pauseBtn = document.getElementById('btn-pause-flow');
   const resetBtn = document.getElementById('btn-reset-view');
+  const focusBtn = document.getElementById('btn-focus-graph');
+
+  if (focusBtn) {
+    focusBtn.addEventListener('click', toggleGraphFocus);
+  }
 
   if (pauseBtn) {
     pauseBtn.addEventListener('click', toggleFlowAnimation);
@@ -483,6 +489,31 @@ function initGraphCanvas() {
       loadGraphTopology();
     });
   }
+
+  const box = document.querySelector('.graph-viewport-box');
+  if (box) {
+    box.addEventListener('click', () => {
+      box.classList.add('is-focused');
+    });
+  }
+
+  window.addEventListener('click', (e) => {
+    if (box && !box.contains(e.target) && !state.isGraphFocused) {
+      box.classList.remove('is-focused');
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state.isGraphFocused) {
+      toggleGraphFocus();
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if (state.detectState === 'B') {
+      resizeGraphCanvas();
+    }
+  });
 
   // Interactive mouse events
   canvas.addEventListener('mousedown', handleMouseDown);
@@ -497,6 +528,36 @@ function initGraphCanvas() {
     animFrameId = requestAnimationFrame(loop);
   }
   loop();
+}
+
+function toggleGraphFocus() {
+  state.isGraphFocused = !state.isGraphFocused;
+  const grid = document.querySelector('.investigation-grid');
+  const focusBtn = document.getElementById('btn-focus-graph');
+  const focusText = document.getElementById('focus-graph-text');
+  const focusIcon = document.getElementById('focus-graph-icon');
+  const box = document.querySelector('.graph-viewport-box');
+
+  if (grid) grid.classList.toggle('graph-focused', state.isGraphFocused);
+  if (box) box.classList.toggle('is-focused', state.isGraphFocused);
+  if (focusBtn) focusBtn.classList.toggle('btn-focus-active', state.isGraphFocused);
+
+  if (focusText) {
+    focusText.textContent = state.isGraphFocused ? 'Exit focus (Esc)' : 'Focus view';
+  }
+
+  if (focusIcon) {
+    focusIcon.innerHTML = state.isGraphFocused
+      ? '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"/>'
+      : '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>';
+  }
+
+  setTimeout(() => {
+    resizeGraphCanvas();
+    if (state.currentSessionId) {
+      loadGraphTopology();
+    }
+  }, 350);
 }
 
 function toggleFlowAnimation() {
@@ -515,8 +576,8 @@ function toggleFlowAnimation() {
 function resizeGraphCanvas() {
   if (!canvas) return;
   const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width || 680;
-  canvas.height = 440;
+  canvas.width = rect.width || (state.isGraphFocused ? 1120 : 720);
+  canvas.height = rect.height || (state.isGraphFocused ? 760 : 600);
 }
 
 function initGraphSlider() {
