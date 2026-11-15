@@ -102,6 +102,14 @@ class TestTGATBackend(unittest.TestCase):
         self.assertIn("TGAT", res.text)
         self.assertIn("FRAUD RING DEFENDER", res.text)
 
+    def test_sample_elliptic_benchmark(self):
+        res = self.client.get("/api/analysis/sample?dataset=elliptic")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("Elliptic", data["filename"])
+        self.assertGreater(data["row_count"], 0)
+        self.assertIn("csv_content", data)
+
 
 if __name__ == "__main__":
     unittest.main()

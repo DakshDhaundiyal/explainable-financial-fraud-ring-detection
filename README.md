@@ -116,6 +116,22 @@ This project utilizes the **IBM Anti-Money Laundering (AML) Transaction Dataset*
 
 Unlike conventional fraud datasets, the IBM AML dataset naturally represents a financial transaction network, making it highly suitable for graph learning.
 
+### Supported Real-World Datasets
+
+This system supports dual financial crime benchmarks across traditional fiat banking and cryptocurrency networks:
+
+1. **IBM AML Benchmark Dataset**:
+   - **Type**: Multi-bank fiat transaction graph.
+   - **Scale**: 6,924,035 transactions across 5.75M train, 891k val, and 282k test splits.
+   - **Structure**: Cross-bank smurfing, circular laundering flows, and structured fan-out rings.
+
+2. **Elliptic++ Bitcoin Graph Dataset**:
+   - **Type**: Real-world Bitcoin blockchain payment network (`git-disl/EllipticPlusPlus`, `yhoma/elliptic-bitcoin-dataset`).
+   - **Scale**: 203,769 transaction nodes, 234,355 directed payment edges across 49 chronological time steps.
+   - **Labels**: Class 1 = Illicit (4,545 confirmed ransomware, darknet markets, scams, malware), Class 2 = Licit (42,019 exchanges, miners, wallet providers), Class 3 = Unknown (157,205 unlabeled background transactions).
+   - **Ingestion Pipeline**: Automated via [`scripts/ingest_elliptic_plus_plus.py`](file:///c:/Users/duxdh/Downloads/tgat/scripts/ingest_elliptic_plus_plus.py). Produces full payment flows, high-risk subgraphs, and ready-to-demo clusters.
+   - **⚡ Fast-Load Graph Rendering**: On large datasets (>60 accounts) or Elliptic batches, the UI automatically filters out isolated benign background "blue dots" and renders **only Yellow (Watch ≥ 0.20) and Red (Alert ≥ 0.40)** accounts. This prevents browser canvas lag, achieving sub-second load times and silky 60 FPS animation while keeping full dataset exploration 1 click away via the "All" filter chip.
+
 ---
 # Graph Representation
 

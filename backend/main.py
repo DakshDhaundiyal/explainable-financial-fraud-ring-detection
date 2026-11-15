@@ -359,18 +359,40 @@ def run_batch_analysis(payload: BatchRunRequest):
 
 
 @app.get("/api/analysis/sample")
-def get_sample_benchmark_data(count: int = Query(50, ge=10, le=2000)):
-    """Return a real sample from test.csv for instant 5-minute academic demonstration."""
+def get_sample_benchmark_data(
+    count: int = Query(50, ge=10, le=2000),
+    dataset: Optional[str] = Query(None),
+):
+    """Return real benchmark data (IBM AML or Elliptic++ Bitcoin) for instant demonstration."""
     ms = get_model_service()
     try:
-        sample_df = ms.get_benchmark_sample(count=count)
-        csv_str = sample_df.to_csv(index=False)
-        return {
-            "filename": f"ibm_aml_benchmark_sample_{count}tx.csv",
-            "row_count": len(sample_df),
-            "csv_content": csv_str,
-            "preview": sample_df.head(5).to_dict(orient="records"),
-        }
+        if dataset and dataset.lower() in ("elliptic", "elliptic++", "btc", "bitcoin"):
+            demo_ring_path = Path("data/processed/elliptic_demo_ring.csv")
+            subgraph_path = Path("data/processed/elliptic_suspicious_subgraph.csv")
+            if demo_ring_path.exists():
+                sample_df = pd.read_csv(demo_ring_path)
+            elif subgraph_path.exists():
+                sample_df = pd.read_csv(subgraph_path).head(count)
+            else:
+                raise HTTPException(status_code=404, detail="Elliptic++ dataset is currently processing. Please retry in a few seconds.")
+            csv_str = sample_df.to_csv(index=False)
+            return {
+                "filename": "Elliptic++ Bitcoin Benchmark (Illicit Rings)",
+                "row_count": len(sample_df),
+                "csv_content": csv_str,
+                "preview": sample_df.head(5).to_dict(orient="records"),
+            }
+        else:
+            sample_df = ms.get_benchmark_sample(count=count)
+            csv_str = sample_df.to_csv(index=False)
+            return {
+                "filename": f"ibm_aml_benchmark_sample_{count}tx.csv",
+                "row_count": len(sample_df),
+                "csv_content": csv_str,
+                "preview": sample_df.head(5).to_dict(orient="records"),
+            }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate sample: {str(e)}")
 

@@ -140,22 +140,40 @@ def detect_and_validate_csv(csv_bytes: bytes, filename: str = "upload.csv") -> T
         from_col = find_col([
             "From Account", "from_account", "from_address", "fromaddress",
             "sender", "sender_account", "source", "source_account", "src",
-            "nameorig", "name_orig", "origin", "from", "sender_id", "from_acc"
+            "nameorig", "name_orig", "origin", "from", "sender_id", "from_acc",
+            "txId1", "txid1", "tx_id_1", "input_address", "in_addr", "addr1"
         ])
         to_col = find_col([
             "To Account", "to_account", "to_address", "toaddress",
             "receiver", "receiver_account", "target", "destination",
             "destination_account", "dest", "dst", "namedest", "name_dest",
-            "to", "receiver_id", "to_acc"
+            "to", "receiver_id", "to_acc",
+            "txId2", "txid2", "tx_id_2", "output_address", "out_addr", "addr2"
         ])
         time_col = find_col([
             "Timestamp", "time", "date", "datetime", "trans_date_trans_time",
-            "block_timestamp", "txtime", "tx_time", "step", "epoch", "block_time"
+            "block_timestamp", "txtime", "tx_time", "step", "epoch", "block_time",
+            "time_step", "timestep"
         ])
         amt_col = find_col([
             "Amount Received", "Amount Paid", "amount", "value", "amt",
-            "trans_amount", "transaction_amount", "val", "tx_amount"
+            "trans_amount", "transaction_amount", "val", "tx_amount",
+            "btc_amount", "btc", "fee", "usd_amount"
         ])
+
+        # If sender and receiver are present but timestamp or amount is omitted (e.g. raw edgelist),
+        # provide friendly synthetic sequential defaults so graph topology can be analyzed
+        if from_col and to_col and not time_col:
+            base_dt = datetime(2024, 1, 1, 0, 0, 0)
+            df["Timestamp"] = [(base_dt + pd.Timedelta(seconds=i*30)).strftime("%Y-%m-%d %H:%M:%S") for i in range(len(df))]
+            time_col = "Timestamp"
+            warnings.append("No explicit timestamp column detected. Generated sequential timestamps (30s intervals) for temporal flow.")
+
+        if from_col and to_col and not amt_col:
+            df["Amount Received"] = 1000.0
+            df["Amount Paid"] = 1000.0
+            amt_col = "Amount Received"
+            warnings.append("No explicit amount column detected. Assigned standard baseline volume ($1,000.00) for graph nodes.")
 
         if from_col and to_col and time_col and amt_col:
             # Map into canonical schema
@@ -164,7 +182,15 @@ def detect_and_validate_csv(csv_bytes: bytes, filename: str = "upload.csv") -> T
             if to_col != "To Account":
                 df["To Account"] = df[to_col]
             if time_col != "Timestamp":
-                df["Timestamp"] = df[time_col]
+                try:
+                    numeric_steps = pd.to_numeric(df[time_col], errors="coerce")
+                    if numeric_steps.notna().mean() > 0.8 and numeric_steps.max() <= 1000:
+                        base_dt = datetime(2017, 1, 1, 0, 0, 0)
+                        df["Timestamp"] = [(base_dt + pd.Timedelta(days=int(s if pd.notna(s) else 1)*14, seconds=(i % 1209600))).strftime("%Y-%m-%d %H:%M:%S") for i, s in enumerate(numeric_steps)]
+                    else:
+                        df["Timestamp"] = df[time_col]
+                except Exception:
+                    df["Timestamp"] = df[time_col]
 
             amt_recv_col = find_col(["Amount Received", "amount_received"])
             amt_paid_col = find_col(["Amount Paid", "amount_paid"])

@@ -14,8 +14,8 @@ const state = {
   selectedAccountId: null,
   activeSubtab: 'why',
   isPaused: false,
-  minRiskFilter: 0,
-  demoBatchSize: 1000,
+  minRiskFilter: 0.20, // Fast-load: default to Yellow & Red accounts (risk >= 0.20) to prevent browser UI lag
+  demoBatchSize: 'elliptic', // Default to Elliptic++ Bitcoin dataset
   
   // Graph Canvas & Simulation
   graphNodes: [],
@@ -119,6 +119,7 @@ function initStartActions() {
   const dropzone = document.getElementById('dropzone-box');
   const size50Btn = document.getElementById('demo-size-50');
   const size1000Btn = document.getElementById('demo-size-1000');
+  const sizeEllipticBtn = document.getElementById('demo-size-elliptic');
   const runDemoText = document.getElementById('run-demo-text');
   const demoTimeHint = document.getElementById('demo-time-hint');
 
@@ -127,6 +128,7 @@ function initStartActions() {
       state.demoBatchSize = 50;
       size50Btn.classList.add('active');
       if (size1000Btn) size1000Btn.classList.remove('active');
+      if (sizeEllipticBtn) sizeEllipticBtn.classList.remove('active');
       if (runDemoText) runDemoText.textContent = 'Run demo (50 tx)';
       if (demoTimeHint) demoTimeHint.textContent = 'Takes about a second.';
     });
@@ -137,13 +139,25 @@ function initStartActions() {
       state.demoBatchSize = 1000;
       size1000Btn.classList.add('active');
       if (size50Btn) size50Btn.classList.remove('active');
+      if (sizeEllipticBtn) sizeEllipticBtn.classList.remove('active');
       if (runDemoText) runDemoText.textContent = 'Run demo (1,000+ accounts)';
       if (demoTimeHint) demoTimeHint.textContent = 'Takes ~1.5 seconds.';
     });
   }
 
+  if (sizeEllipticBtn) {
+    sizeEllipticBtn.addEventListener('click', () => {
+      state.demoBatchSize = 'elliptic';
+      sizeEllipticBtn.classList.add('active');
+      if (size50Btn) size50Btn.classList.remove('active');
+      if (size1000Btn) size1000Btn.classList.remove('active');
+      if (runDemoText) runDemoText.textContent = 'Run demo (Elliptic++ Bitcoin Fraud Rings)';
+      if (demoTimeHint) demoTimeHint.textContent = 'Real Elliptic++ Bitcoin dataset (~1.5s). Fast-loads Yellow & Red rings.';
+    });
+  }
+
   if (demoBtn) {
-    demoBtn.addEventListener('click', () => runDemoBatch(state.demoBatchSize || 1000));
+    demoBtn.addEventListener('click', () => runDemoBatch(state.demoBatchSize || 'elliptic'));
   }
 
   if (chooseFileBtn && fileInput) {
@@ -177,7 +191,7 @@ function initStartActions() {
   }
 }
 
-async function runDemoBatch(count = 1000) {
+async function runDemoBatch(count = 'elliptic') {
   const demoBtn = document.getElementById('btn-run-demo');
   const runAgainBtn = document.getElementById('btn-run-again');
   if (demoBtn) {
@@ -190,15 +204,21 @@ async function runDemoBatch(count = 1000) {
   }
 
   try {
-    const sampleRes = await fetch(`/api/analysis/sample?count=${count}`);
+    const isElliptic = (count === 'elliptic' || state.demoBatchSize === 'elliptic');
+    const url = isElliptic ? '/api/analysis/sample?dataset=elliptic&count=300' : `/api/analysis/sample?count=${count}`;
+    const sampleRes = await fetch(url);
     if (!sampleRes.ok) throw new Error('Could not fetch sample transactions.');
     const sampleData = await sampleRes.json();
+
+    const filename = isElliptic
+      ? 'Elliptic++ Bitcoin Benchmark (Illicit Rings)'
+      : (count >= 500 ? 'IBM AML Benchmark (1,000+ accounts)' : 'IBM AML Demo Batch (50 txs)');
 
     const runRes = await fetch('/api/analysis/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filename: count >= 500 ? 'IBM AML Benchmark (1,000+ accounts)' : 'IBM AML Demo Batch (50 txs)',
+        filename: filename,
         csv_content: sampleData.csv_content,
       }),
     });
@@ -222,7 +242,9 @@ async function runDemoBatch(count = 1000) {
   } finally {
     if (demoBtn) {
       demoBtn.disabled = false;
-      const label = state.demoBatchSize >= 500 ? 'Run demo (1,000+ accounts)' : 'Run demo (50 tx)';
+      let label = 'Run demo (Elliptic++ Bitcoin Fraud Rings)';
+      if (state.demoBatchSize === 50) label = 'Run demo (50 tx)';
+      else if (state.demoBatchSize === 1000) label = 'Run demo (1,000+ accounts)';
       demoBtn.innerHTML = `
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M7 4.5v15l12-7.5z"></path></svg>
         <span id="run-demo-text">${label}</span>
@@ -421,7 +443,19 @@ function renderResultsState(data) {
     alertLabel.textContent = `Alert line ${thresh.toFixed(2)}`;
   }
 
-  // 6. Load Graph & Auto-Select Highest-Risk Account
+  // 6. Fast-Load Filtering:
+  // For large batches or Elliptic dataset, default to Yellow (Watch ≥ 0.20) & Red (Alert) nodes only,
+  // preventing browser lag from isolated normal blue dots while focusing investigation on fraud rings.
+  const isLargeOrElliptic = (data.distinct_accounts && data.distinct_accounts >= 60) || 
+                            (data.total_transactions && data.total_transactions >= 80) ||
+                            (data.filename && data.filename.toLowerCase().includes('elliptic'));
+  if (isLargeOrElliptic) {
+    state.minRiskFilter = 0.20;
+  } else {
+    state.minRiskFilter = 0;
+  }
+
+  // Load Graph & Auto-Select Highest-Risk Account
   loadGraphTopology();
 }
 
@@ -501,7 +535,7 @@ function initGraphSlider() {
     chipAll.addEventListener('click', () => setGraphRiskFilter(0));
   }
   if (chipWatch) {
-    chipWatch.addEventListener('click', () => setGraphRiskFilter(0.40));
+    chipWatch.addEventListener('click', () => setGraphRiskFilter(0.20));
   }
   if (chipAlert) {
     chipAlert.addEventListener('click', () => setGraphRiskFilter(state.sessionThreshold || 0.399988));
@@ -537,16 +571,21 @@ function updateGraphFilterUI() {
   const total = state.graphNodes.length;
   const matching = state.graphNodes.filter((n) => (n.max_risk_score || 0) >= val).length;
 
+  const slider = document.getElementById('graph-risk-slider');
+  if (slider) slider.value = val;
+
   if (badge) {
     if (val === 0) {
-      badge.textContent = total > 0 ? `Showing all ${total} accounts` : 'Showing all accounts';
+      badge.textContent = total > 0 ? `Showing all ${total} accounts (Blue, Yellow, Red)` : 'Showing all accounts';
+    } else if (Math.abs(val - 0.20) < 0.03) {
+      badge.textContent = `⚡ Fast-Load Active: Showing ${matching} of ${total} accounts (Yellow & Red only · click 'All' to show blue dots)`;
     } else {
       badge.textContent = `Showing ${matching} of ${total} accounts (risk ≥ ${val.toFixed(2)})`;
     }
   }
 
   if (chipAll) chipAll.classList.toggle('active', val === 0);
-  if (chipWatch) chipWatch.classList.toggle('active', Math.abs(val - 0.40) < 0.02);
+  if (chipWatch) chipWatch.classList.toggle('active', Math.abs(val - 0.20) < 0.03);
   if (chipAlert) chipAlert.classList.toggle('active', Math.abs(val - (state.sessionThreshold || 0.399988)) < 0.03);
 }
 
@@ -964,7 +1003,7 @@ function drawCanvasGraph() {
     const isSelected = state.selectedNode && state.selectedNode.id === n.id;
     const isHovered = state.hoveredNode && state.hoveredNode.id === n.id;
     const isRisk = n.is_flagged || (n.max_risk_score || 0) >= state.sessionThreshold;
-    const isWatch = !isRisk && (n.max_risk_score || 0) >= 0.40;
+    const isWatch = !isRisk && (n.max_risk_score || 0) >= 0.20;
 
     let fillColor = '#3B6FE0'; // Normal
     if (isRisk) fillColor = '#D92D20';

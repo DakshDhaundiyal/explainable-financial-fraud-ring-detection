@@ -25,6 +25,7 @@ data/processed/*
 
 # Keep the folder itself in Git
 !data/processed/.gitkeep
+!data/processed/elliptic_demo_ring.csv
 
 # =========================
 # Jupyter

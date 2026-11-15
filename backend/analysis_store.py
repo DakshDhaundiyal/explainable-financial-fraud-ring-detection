@@ -39,10 +39,10 @@ class AnalysisSession:
         self.warnings = warnings
         self.duration_seconds = duration_seconds
         
-        # Risk level counts
+        # Risk level counts (aligned with TGAT v3 frozen threshold of 0.399988)
         self.high_risk_count = sum(1 for t in transactions if t.get("risk_score", 0.0) >= threshold)
-        self.medium_risk_count = sum(1 for t in transactions if 0.40 <= t.get("risk_score", 0.0) < threshold)
-        self.low_risk_count = sum(1 for t in transactions if t.get("risk_score", 0.0) < 0.40)
+        self.medium_risk_count = sum(1 for t in transactions if 0.20 <= t.get("risk_score", 0.0) < threshold)
+        self.low_risk_count = sum(1 for t in transactions if t.get("risk_score", 0.0) < 0.20)
         
         # Distinct high-risk accounts
         high_risk_accs = set()
@@ -140,7 +140,7 @@ class AnalysisSession:
             m_score = node["max_risk_score"]
             if m_score >= self.threshold:
                 node["risk_level"] = "High Risk"
-            elif m_score >= 0.40:
+            elif m_score >= 0.20:
                 node["risk_level"] = "Medium Risk"
             else:
                 node["risk_level"] = "Low Risk"
@@ -149,7 +149,7 @@ class AnalysisSession:
             e_score = edge["max_risk_score"]
             if e_score >= self.threshold:
                 edge["risk_level"] = "High Risk"
-            elif e_score >= 0.40:
+            elif e_score >= 0.20:
                 edge["risk_level"] = "Medium Risk"
             else:
                 edge["risk_level"] = "Low Risk"
