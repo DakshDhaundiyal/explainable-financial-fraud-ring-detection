@@ -378,33 +378,27 @@ async function handleFileUpload(file) {
 
   const dropIdle = document.getElementById('dropzone-idle-content');
   const dropProg = document.getElementById('dropzone-progress-content');
+  const bar = document.getElementById('upload-progress-bar');
+  const pct = document.getElementById('loading-percent-label');
+  const stage = document.getElementById('loading-stage-label');
+  const eta = document.getElementById('loading-eta-label');
+  const fn = document.getElementById('loading-filename-text');
+
   if (dropIdle) dropIdle.style.display = 'none';
   if (dropProg) dropProg.style.display = 'flex';
+  if (fn) fn.textContent = file.name;
+  if (bar) bar.style.width = '5%';
+  if (pct) pct.textContent = '5%';
+  if (stage) stage.textContent = `Reading ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`;
+  if (eta) eta.textContent = 'Connecting to TGAT v3 engine...';
 
-  const estDurationMs = Math.min(10000, Math.max(1600, (file.size / (1024 * 1024)) * 320));
-
-  progressController.start({
-    containerId: 'dropzone-progress-content',
-    barId: 'upload-progress-bar',
-    pctId: 'loading-percent-label',
-    stageId: 'loading-stage-label',
-    etaId: 'loading-eta-label',
-    filename: file.name,
-    estimatedMs: estDurationMs,
-    stages: [
-      { atPct: 10, text: `Reading ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)...` },
-      { atPct: 30, text: 'Auto-mapping schema & building temporal edges...' },
-      { atPct: 55, text: 'Analyzing and scoring with TGAT model (CUDA)...' },
-      { atPct: 80, text: 'Computing dynamic attention weights & risk tiers...' },
-      { atPct: 95, text: 'Finalizing network topology & AI briefing...' },
-    ]
-  });
+  const startTime = Date.now();
 
   const reader = new FileReader();
   reader.onload = async (e) => {
     const csvContent = e.target.result;
     try {
-      const runRes = await fetch('/api/analysis/run', {
+      const response = await fetch('/api/analysis/run-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -413,34 +407,80 @@ async function handleFileUpload(file) {
         }),
       });
 
-      if (!runRes.ok) {
-        const err = await runRes.json().catch(() => ({}));
-        progressController.stop('dropzone-progress-content');
-        if (dropIdle) dropIdle.style.display = 'flex';
-        showFileProblem(err.detail || 'Your file could not be analyzed. Check that sender, receiver, amount and time columns are included.');
-        return;
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Server returned status ${response.status}`);
       }
 
-      const runData = await runRes.json();
-      state.currentSessionId = runData.session_id;
-      state.sessionThreshold = runData.threshold || 0.399988;
+      const streamReader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let lastOverviewData = null;
 
-      const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(runData.session_id)}`);
-      const ovData = await ovRes.json();
+      while (true) {
+        const { done, value } = await streamReader.read();
+        if (done) break;
 
-      await progressController.complete({
-        containerId: 'dropzone-progress-content',
-        barId: 'upload-progress-bar',
-        pctId: 'loading-percent-label',
-        stageId: 'loading-stage-label',
-        etaId: 'loading-eta-label',
-      });
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep partial trailing line
 
-      if (dropIdle) dropIdle.style.display = 'flex';
-      renderResultsState(ovData);
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let evt;
+          try {
+            evt = JSON.parse(line);
+          } catch (_) {
+            continue;
+          }
+
+          if (evt.error) {
+            throw new Error(evt.detail || 'Validation failed on uploaded CSV.');
+          }
+
+          // Real progress directly from PyTorch backend
+          const percent = Math.min(100, Math.max(0, evt.percent || 0));
+          if (bar) bar.style.width = `${percent}%`;
+          if (pct) pct.textContent = `${percent}%`;
+          if (stage && evt.stage) stage.textContent = evt.stage;
+
+          // Compute real ETA based on elapsed time and current percent
+          if (eta) {
+            const elapsed = (Date.now() - startTime) / 1000;
+            if (percent >= 100) {
+              eta.textContent = `Completed in ${elapsed.toFixed(1)}s`;
+            } else if (percent > 10) {
+              const remainingSec = Math.max(0.2, ((elapsed / percent) * (100 - percent))).toFixed(1);
+              eta.textContent = `Est. ~${remainingSec}s remaining`;
+            } else {
+              eta.textContent = 'Estimating remaining time...';
+            }
+          }
+
+          if (evt.session_id) {
+            state.currentSessionId = evt.session_id;
+          }
+          if (evt.overview) {
+            lastOverviewData = evt.overview;
+          }
+        }
+      }
+
+      if (lastOverviewData) {
+        if (bar) bar.style.width = '100%';
+        if (pct) pct.textContent = '100%';
+        if (stage) stage.textContent = 'Analysis complete! Loading dashboard...';
+        await new Promise((r) => setTimeout(r, 260));
+
+        if (dropProg) dropProg.style.display = 'none';
+        if (dropIdle) dropIdle.style.display = 'flex';
+        renderResultsState(lastOverviewData);
+      } else {
+        throw new Error('Analysis completed without overview data.');
+      }
 
     } catch (err) {
-      progressController.stop('dropzone-progress-content');
+      if (dropProg) dropProg.style.display = 'none';
       if (dropIdle) dropIdle.style.display = 'flex';
       showFileProblem(err.message || 'Error uploading file.');
     }

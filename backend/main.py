@@ -5,6 +5,7 @@ batch transaction upload analysis, interactive graph queries, and evaluation ben
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -15,7 +16,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -356,6 +357,115 @@ def run_batch_analysis(payload: BatchRunRequest):
         "duration_seconds": session.duration_seconds,
         "warnings": session.warnings,
     }
+
+
+@app.post("/api/analysis/run-stream")
+async def run_batch_analysis_stream(payload: BatchRunRequest):
+    """Execute causal batch TGAT scoring with real-time streaming progress events."""
+    async def event_generator():
+        try:
+            content = payload.csv_content.encode("utf-8")
+            size_mb = len(content) / (1024 * 1024)
+            yield json.dumps({
+                "percent": 5,
+                "stage": f"Reading CSV data ({size_mb:.1f} MB)...",
+                "processed": 0,
+                "total": 0,
+            }) + "\n"
+            await asyncio.sleep(0.01)
+
+            yield json.dumps({
+                "percent": 15,
+                "stage": "Validating CSV columns, account identifiers & timestamps...",
+                "processed": 0,
+                "total": 0,
+            }) + "\n"
+            await asyncio.sleep(0.01)
+
+            val_result, valid_df = detect_and_validate_csv(content, filename=payload.filename)
+            if not val_result.valid or valid_df is None or len(valid_df) == 0:
+                detail_msg = val_result.errors[0].message if val_result.errors else "Uploaded file failed validation."
+                yield json.dumps({
+                    "error": True,
+                    "detail": detail_msg,
+                }) + "\n"
+                return
+
+            total_txs = len(valid_df)
+            yield json.dumps({
+                "percent": 25,
+                "stage": f"Verified {total_txs:,} transactions. Auto-mapping account schemas...",
+                "processed": 0,
+                "total": total_txs,
+            }) + "\n"
+            await asyncio.sleep(0.01)
+
+            ms = get_model_service()
+            progress_queue = asyncio.Queue()
+            loop = asyncio.get_event_loop()
+
+            def sync_progress_callback(processed: int, total: int, stage_name: str):
+                pct = int(25 + (processed / max(1, total)) * 65)
+                loop.call_soon_threadsafe(
+                    progress_queue.put_nowait,
+                    {
+                        "percent": pct,
+                        "stage": stage_name,
+                        "processed": processed,
+                        "total": total,
+                    }
+                )
+
+            t0 = time.time()
+            score_task = asyncio.create_task(
+                asyncio.to_thread(ms.predict_batch, valid_df, causal=True, progress_callback=sync_progress_callback)
+            )
+
+            while not score_task.done():
+                try:
+                    update = await asyncio.wait_for(progress_queue.get(), timeout=0.08)
+                    yield json.dumps(update) + "\n"
+                except asyncio.TimeoutError:
+                    pass
+
+            while not progress_queue.empty():
+                update = progress_queue.get_nowait()
+                yield json.dumps(update) + "\n"
+
+            scored_records = await score_task
+            duration = time.time() - t0
+
+            yield json.dumps({
+                "percent": 95,
+                "stage": "Constructing interactive graph topology & risk rings...",
+                "processed": total_txs,
+                "total": total_txs,
+            }) + "\n"
+            await asyncio.sleep(0.02)
+
+            session = analysis_store.add_session(
+                filename=payload.filename,
+                transactions=scored_records,
+                threshold=ms.threshold,
+                warnings=val_result.warnings,
+                duration_seconds=duration,
+            )
+
+            overview_data = get_analysis_overview(session_id=session.session_id)
+
+            yield json.dumps({
+                "percent": 100,
+                "stage": "Analysis complete! Loading dashboard...",
+                "processed": total_txs,
+                "total": total_txs,
+                "session_id": session.session_id,
+                "overview": overview_data,
+            }) + "\n"
+
+        except Exception as e:
+            yield json.dumps({"error": True, "detail": str(e)}) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 
 @app.get("/api/analysis/sample")

@@ -154,6 +154,20 @@ class TestAnalysisWorkflow(unittest.TestCase):
         self.assertEqual(ov_ibm_data["session_id"], "ANL-IBM-FULL")
         self.assertEqual(ov_ibm_data["total_transactions"], 282877)
 
+    def test_streaming_run_progress(self):
+        sample_res = self.client.get("/api/analysis/sample?count=20")
+        sample_csv = sample_res.json()["csv_content"]
+
+        res = self.client.post("/api/analysis/run-stream", json={"filename": "stream_test.csv", "csv_content": sample_csv})
+        self.assertEqual(res.status_code, 200)
+        lines = [line.strip() for line in res.text.split("\n") if line.strip()]
+        self.assertTrue(len(lines) >= 3)
+        import json
+        events = [json.loads(line) for line in lines]
+        percents = [e.get("percent") for e in events if "percent" in e]
+        self.assertIn(100, percents)
+        self.assertTrue(events[-1].get("session_id") is not None)
+
 
 if __name__ == "__main__":
     unittest.main()
