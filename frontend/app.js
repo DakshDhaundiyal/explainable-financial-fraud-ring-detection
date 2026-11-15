@@ -24,6 +24,7 @@ const state = {
   particles: [],
   transform: { x: 0, y: 0, scale: 1 },
   selectedNode: null,
+  ringIsolatedNodeId: null, // When set, canvas isolates and displays ONLY the connected ring of this account
   dragNode: null,
   hoveredNode: null,
   isPanning: false,
@@ -844,18 +845,29 @@ function updateGraphFilterUI() {
   if (slider) slider.value = val;
 
   if (badge) {
-    if (val === 0) {
-      if (networkTotal > total) {
-        badge.textContent = `Showing all ${total} connected accounts (Blue Normal, Yellow Watch, Red Alert · of ${networkTotal.toLocaleString()} in network)`;
-      } else {
-        badge.textContent = total > 0 ? `Showing all ${total} connected accounts (Blue, Yellow, Red)` : 'Showing all connected accounts';
-      }
-    } else if (Math.abs(val - 0.20) < 0.02) {
-      badge.textContent = `Watch Tier: Showing ${matching} of ${total} connected accounts (Yellow & Red ≥ 0.20)`;
-    } else if (Math.abs(val - (state.sessionThreshold || 0.40)) < 0.02) {
-      badge.textContent = `Alert Tier: Showing ${matching} of ${total} connected accounts (Red only ≥ ${(state.sessionThreshold || 0.40).toFixed(2)})`;
+    if (state.ringIsolatedNodeId) {
+      const ringCount = state.visibleNodeIds ? state.visibleNodeIds.size : 1;
+      badge.textContent = `⚡ Ring Focus: Showing ${ringCount} accounts in this ring · Tap account again to show all`;
+      badge.style.background = '#FEF3C7';
+      badge.style.color = '#92400E';
+      badge.style.borderColor = '#F59E0B';
     } else {
-      badge.textContent = `Showing ${matching} of ${total} connected accounts (risk ≥ ${val.toFixed(2)})`;
+      badge.style.background = '';
+      badge.style.color = '';
+      badge.style.borderColor = '';
+      if (val === 0) {
+        if (networkTotal > total) {
+          badge.textContent = `Showing all ${total} connected accounts (Blue Normal, Yellow Watch, Red Alert · of ${networkTotal.toLocaleString()} in network)`;
+        } else {
+          badge.textContent = total > 0 ? `Showing all ${total} connected accounts (Blue, Yellow, Red)` : 'Showing all connected accounts';
+        }
+      } else if (Math.abs(val - 0.20) < 0.02) {
+        badge.textContent = `Watch Tier: Showing ${matching} of ${total} connected accounts (Yellow & Red ≥ 0.20)`;
+      } else if (Math.abs(val - (state.sessionThreshold || 0.40)) < 0.02) {
+        badge.textContent = `Alert Tier: Showing ${matching} of ${total} connected accounts (Red only ≥ ${(state.sessionThreshold || 0.40).toFixed(2)})`;
+      } else {
+        badge.textContent = `Showing ${matching} of ${total} connected accounts (risk ≥ ${val.toFixed(2)})`;
+      }
     }
   }
 
@@ -1153,6 +1165,40 @@ function runBoundedForceSimulation() {
   }, 20);
 }
 
+function getConnectedRingNodeIds(startId, activeEdges) {
+  const ringIds = new Set();
+  if (!startId) return ringIds;
+
+  const adj = new Map();
+  for (let i = 0; i < activeEdges.length; i++) {
+    const e = activeEdges[i];
+    const s = e.source;
+    const t = e.target;
+    if (!adj.has(s)) adj.set(s, []);
+    if (!adj.has(t)) adj.set(t, []);
+    adj.get(s).push(t);
+    adj.get(t).push(s);
+  }
+
+  ringIds.add(startId);
+  const queue = [startId];
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    const neighbors = adj.get(curr);
+    if (neighbors) {
+      for (let i = 0; i < neighbors.length; i++) {
+        const nextId = neighbors[i];
+        if (!ringIds.has(nextId)) {
+          ringIds.add(nextId);
+          queue.push(nextId);
+        }
+      }
+    }
+  }
+
+  return ringIds;
+}
+
 function drawCanvasGraph() {
   if (!ctx || !canvas) return;
   const width = canvas.width;
@@ -1174,11 +1220,19 @@ function drawCanvasGraph() {
     connectedNodeIds.add(activeEdges[i].target);
   }
 
-  // 3. Visible nodes: ONLY accounts that are connected to each other (no isolated floating dots)
+  // 3. Ring Isolation Mode: If an account has been tapped to isolate its ring, find all nodes in its ring/component
+  let isolatedRingNodeIds = null;
+  if (state.ringIsolatedNodeId && connectedNodeIds.has(state.ringIsolatedNodeId)) {
+    isolatedRingNodeIds = getConnectedRingNodeIds(state.ringIsolatedNodeId, activeEdges);
+  }
+
+  // 4. Visible nodes: ONLY accounts that are connected to each other (and in the isolated ring if active)
   const visibleNodeIds = new Set();
   state.graphNodes.forEach((n) => {
     if (connectedNodeIds.has(n.id)) {
-      visibleNodeIds.add(n.id);
+      if (!isolatedRingNodeIds || isolatedRingNodeIds.has(n.id)) {
+        visibleNodeIds.add(n.id);
+      }
     }
   });
 
@@ -1383,6 +1437,34 @@ function drawCanvasGraph() {
   });
 
   ctx.restore();
+
+  // Screen-space Ring Focus Banner (drawn directly in canvas coordinates)
+  if (state.ringIsolatedNodeId && isolatedRingNodeIds) {
+    const ringCount = visibleNodeIds.size;
+    const bannerText = `⚡ Ring Focus: ${ringCount} accounts · Tap account or canvas to show all rings`;
+    ctx.save();
+    ctx.font = '600 12.5px Inter, sans-serif';
+    const textWidth = ctx.measureText(bannerText).width;
+    const bx = 16;
+    const by = 16;
+    const bw = textWidth + 24;
+    const bh = 32;
+
+    // Dark pill container
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#6366F1';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#EEF2FF';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(bannerText, bx + 12, by + bh / 2);
+    ctx.restore();
+  }
 }
 
 // Canvas Mouse Handlers (Drag, Pan, Zoom, Click)
@@ -1400,8 +1482,11 @@ function isNodeVisible(node) {
   return state.visibleNodeIds ? state.visibleNodeIds.has(node.id) : false;
 }
 
+let mouseDownPos = null;
+
 function handleMouseDown(e) {
   const { screenX, screenY, worldX, worldY } = getMousePos(e);
+  mouseDownPos = { screenX, screenY, time: Date.now(), targetNode: null };
 
   for (let i = state.graphNodes.length - 1; i >= 0; i--) {
     const node = state.graphNodes[i];
@@ -1409,7 +1494,7 @@ function handleMouseDown(e) {
     const dist = Math.hypot(node.x - worldX, node.y - worldY);
     if (dist <= node.radius + 8) {
       state.dragNode = node;
-      selectAccountNode(node);
+      mouseDownPos.targetNode = node;
       return;
     }
   }
@@ -1445,9 +1530,43 @@ function handleMouseMove(e) {
   canvas.style.cursor = hovered ? 'pointer' : (state.isPanning ? 'grabbing' : 'grab');
 }
 
-function handleMouseUp() {
+function handleMouseUp(e) {
+  if (mouseDownPos) {
+    const { screenX, screenY } = getMousePos(e);
+    const moved = Math.hypot(screenX - mouseDownPos.screenX, screenY - mouseDownPos.screenY);
+
+    // If movement was minimal (< 8px), it's a tap/click!
+    if (moved < 8) {
+      // Tap on top-left ring badge clears ring isolation
+      if (state.ringIsolatedNodeId && screenX >= 16 && screenX <= 420 && screenY >= 16 && screenY <= 52) {
+        unselectAccountAndShowAll();
+        state.dragNode = null;
+        state.isPanning = false;
+        mouseDownPos = null;
+        return;
+      }
+
+      if (mouseDownPos.targetNode) {
+        const clickedNode = mouseDownPos.targetNode;
+        // If clicking the already selected/isolated account -> UNSELECT & SHOW ALL RINGS
+        if (state.ringIsolatedNodeId === clickedNode.id) {
+          unselectAccountAndShowAll();
+        } else {
+          // Isolate clicked account's ring!
+          selectAccountAndIsolateRing(clickedNode);
+        }
+      } else {
+        // Tapped empty background canvas: if a ring was isolated, unselect and show all rings
+        if (state.ringIsolatedNodeId) {
+          unselectAccountAndShowAll();
+        }
+      }
+    }
+  }
+
   state.dragNode = null;
   state.isPanning = false;
+  mouseDownPos = null;
 }
 
 function handleWheel(e) {
@@ -1500,6 +1619,75 @@ function switchSubtab(tabName) {
   if (pRanked) pRanked.style.display = tabName === 'ranked' ? 'block' : 'none';
   if (pTxs) pTxs.style.display = tabName === 'txs' ? 'block' : 'none';
   if (pConn) pConn.style.display = tabName === 'connections' ? 'block' : 'none';
+}
+
+function selectAccountAndIsolateRing(node) {
+  if (!node) return;
+  state.ringIsolatedNodeId = node.id;
+  selectAccountNode(node);
+  updateGraphFilterUI();
+}
+
+function unselectAccountAndShowAll() {
+  state.ringIsolatedNodeId = null;
+  state.selectedNode = null;
+  state.selectedAccountId = null;
+
+  if (canvas) {
+    canvas.setAttribute('aria-label', 'Network of accounts. All rings visible. Tap an account to isolate its ring.');
+  }
+
+  const accIdEl = document.getElementById('account-selected-id');
+  if (accIdEl) accIdEl.textContent = 'None (All rings visible)';
+
+  const pill = document.getElementById('account-status-pill');
+  if (pill) {
+    pill.className = 'status-pill normal';
+    pill.textContent = 'All Rings';
+  }
+
+  const scoreNum = document.getElementById('account-score-num');
+  if (scoreNum) scoreNum.innerHTML = `-- <span style="font-size: 13px; font-weight: 500; color: var(--text-muted);">tap account</span>`;
+  const meterFill = document.getElementById('account-meter-fill');
+  if (meterFill) {
+    meterFill.style.width = '0%';
+    meterFill.className = 'meter-fill normal';
+  }
+
+  const calloutBox = document.getElementById('why-callout-box');
+  const cTitle = document.getElementById('why-callout-title');
+  const cDesc = document.getElementById('why-callout-desc');
+  if (calloutBox) calloutBox.className = 'why-callout normal';
+  if (cTitle) cTitle.textContent = 'All Rings Visible';
+  if (cDesc) cDesc.textContent = 'Tap any account on the graph to isolate its connected ring and inspect its simple AI explanation.';
+
+  const aiNarrativeText = document.getElementById('ai-narrative-text');
+  if (aiNarrativeText) {
+    aiNarrativeText.textContent = 'Tap any account on the graph to isolate its ring and view its simple AI explanation.';
+  }
+
+  const factTx = document.getElementById('fact-transactions');
+  const factLinked = document.getElementById('fact-linked');
+  const factIn = document.getElementById('fact-money-in');
+  const factOut = document.getElementById('fact-money-out');
+  if (factTx) factTx.textContent = '0';
+  if (factLinked) factLinked.textContent = '0';
+  if (factIn) factIn.textContent = '$0.00';
+  if (factOut) factOut.textContent = '$0.00';
+
+  const driversContainer = document.getElementById('drivers-container');
+  if (driversContainer) {
+    driversContainer.innerHTML = `
+      <div style="padding: 12px; border-radius: 8px; background: #F8FAFC; border: 1px dashed var(--border-card); font-size: 13px; color: var(--text-muted); text-align: center;">
+        Select an account to view what affected its score.
+      </div>
+    `;
+  }
+
+  document.querySelectorAll('.side-ranked-item').forEach((el) => el.classList.remove('active'));
+  document.querySelectorAll('.ranked-account-row').forEach((el) => el.classList.remove('selected'));
+
+  updateGraphFilterUI();
 }
 
 async function selectAccountNode(node) {
@@ -1985,8 +2173,12 @@ function renderSideRankedList() {
     item.addEventListener('click', () => {
       const accId = item.dataset.id;
       const targetNode = (state.graphNodes || []).find((n) => n.id === accId) || { id: accId, max_risk_score: 0 };
-      selectAccountNode(targetNode);
-      switchSubtab('why');
+      if (state.ringIsolatedNodeId === accId) {
+        unselectAccountAndShowAll();
+      } else {
+        selectAccountAndIsolateRing(targetNode);
+        switchSubtab('why');
+      }
     });
   });
 }
@@ -2079,9 +2271,13 @@ function renderRankedAccountsTable() {
     row.addEventListener('click', () => {
       const accId = row.dataset.id;
       const targetNode = (state.graphNodes || []).find((n) => n.id === accId) || { id: accId, max_risk_score: 0 };
-      selectAccountNode(targetNode);
-      switchSubtab('why');
-      document.querySelector('.account-column')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (state.ringIsolatedNodeId === accId) {
+        unselectAccountAndShowAll();
+      } else {
+        selectAccountAndIsolateRing(targetNode);
+        switchSubtab('why');
+        document.querySelector('.account-column')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
   });
 }
@@ -2115,8 +2311,12 @@ function initRankedAccountsEvents() {
 window.handleAccountSelectById = function(accId) {
   const node = state.graphNodes.find((n) => n.id === accId);
   if (node) {
-    selectAccountNode(node);
-    switchSubtab('why');
+    if (state.ringIsolatedNodeId === accId) {
+      unselectAccountAndShowAll();
+    } else {
+      selectAccountAndIsolateRing(node);
+      switchSubtab('why');
+    }
   }
 };
 
