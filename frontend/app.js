@@ -394,28 +394,24 @@ async function handleFileUpload(file) {
 
   const startTime = Date.now();
 
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const csvContent = e.target.result;
-    try {
-      const response = await fetch('/api/analysis/run-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: file.name,
-          csv_content: csvContent,
-        }),
-      });
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || `Server returned status ${response.status}`);
-      }
+    const response = await fetch('/api/analysis/run-stream', {
+      method: 'POST',
+      body: formData,
+    });
 
-      const streamReader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-      let lastOverviewData = null;
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || `Server returned status ${response.status}`);
+    }
+
+    const streamReader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let lastOverviewData = null;
 
       while (true) {
         const { done, value } = await streamReader.read();
@@ -484,9 +480,7 @@ async function handleFileUpload(file) {
       if (dropIdle) dropIdle.style.display = 'flex';
       showFileProblem(err.message || 'Error uploading file.');
     }
-  };
-  reader.readAsText(file);
-}
+  }
 
 function showFileProblem(msg) {
   const stateA = document.getElementById('detect-state-a');

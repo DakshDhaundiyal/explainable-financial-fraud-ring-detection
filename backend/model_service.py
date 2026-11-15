@@ -228,35 +228,67 @@ class ModelService:
         state_store = TemporalStateStore() if not has_precomputed else None
         has_scores = ("score" in df.columns or "risk_score" in df.columns)
 
-        records = df.to_dict(orient="records")
-        total_rows = len(records)
+        total_rows = len(df)
+        step_interval = max(50, total_rows // 100)
+
+        # High-performance vectorized column extractions to eliminate per-row pandas overhead
+        from_accs = df["From Account"].astype(str).values if "From Account" in df.columns else np.array(["UNKNOWN"] * total_rows)
+        to_accs = df["To Account"].astype(str).values if "To Account" in df.columns else np.array(["UNKNOWN"] * total_rows)
+        ts_secs = df["_timestamp_sec"].astype(np.int64).values
+        ts_strs = df["Timestamp"].astype(str).values if "Timestamp" in df.columns else np.array([
+            datetime.utcfromtimestamp(int(s)).strftime("%Y-%m-%d %H:%M:%S") for s in ts_secs
+        ])
+
+        scores_arr = None
+        if has_scores:
+            sc_col = "risk_score" if "risk_score" in df.columns else "score"
+            scores_arr = df[sc_col].astype(np.float32).values
+
+        ground_truth_arr = df["Is Laundering"].values if "Is Laundering" in df.columns else None
+
+        if not has_precomputed:
+            amt_rec_arr = df["Amount Received"].fillna(1000.0).astype(np.float32).values if "Amount Received" in df.columns else np.full(total_rows, 1000.0, dtype=np.float32)
+            amt_paid_arr = df["Amount Paid"].fillna(df["Amount Received"] if "Amount Received" in df.columns else 1000.0).astype(np.float32).values if "Amount Paid" in df.columns else amt_rec_arr
+            amt_diff_arr = np.abs(amt_rec_arr - amt_paid_arr)
+            amt_ratio_arr = amt_rec_arr / np.maximum(amt_paid_arr, 1e-4)
+            log_rec_arr = np.log1p(amt_rec_arr)
+            log_paid_arr = np.log1p(amt_paid_arr)
+
+            if "From Bank" in df.columns and "To Bank" in df.columns:
+                same_bank_arr = (df["From Bank"].astype(str).values == df["To Bank"].astype(str).values).astype(np.float32)
+            else:
+                same_bank_arr = np.zeros(total_rows, dtype=np.float32)
+            cross_bank_arr = (1.0 - same_bank_arr).astype(np.float32)
+
+            if "Receiving Currency" in df.columns and "Payment Currency" in df.columns:
+                same_curr_arr = (df["Receiving Currency"].astype(str).values == df["Payment Currency"].astype(str).values).astype(np.float32)
+            else:
+                same_curr_arr = np.ones(total_rows, dtype=np.float32)
+
+            hours = np.array([int(s[11:13]) if len(s) >= 13 and s[11:13].isdigit() else 12 for s in ts_strs], dtype=np.float32)
+            time_cat_arr = np.where(hours < 6, 0.0, np.where(hours < 12, 1.0, np.where(hours < 18, 2.0, 3.0))).astype(np.float32)
+            is_weekend_arr = np.where((ts_secs // 86400 + 3) % 7 >= 5, 1.0, 0.0).astype(np.float32)
+
+        records = df.to_dict(orient="records") if has_precomputed else None
         results = []
         attention_runs = 0
         max_attention_runs = 60  # Deep attention graphs computed for top flagged cases
 
-        step_interval = max(1, min(50, total_rows // 20))
-
-        for idx, row in enumerate(records):
-            from_acc = str(row.get("From Account", ""))
-            to_acc = str(row.get("To Account", ""))
-            ts_sec = int(row.get("_timestamp_sec", 1662800000))
-            ts_str = str(row.get("Timestamp", datetime.utcfromtimestamp(ts_sec).strftime("%Y-%m-%d %H:%M:%S")))
+        for idx in range(total_rows):
+            from_acc = from_accs[idx]
+            to_acc = to_accs[idx]
+            ts_sec = int(ts_secs[idx])
+            ts_str = ts_strs[idx]
 
             # Build or extract feature dictionary
             if has_precomputed:
+                row = records[idx]
                 feat_dict = {f: float(row.get(f, 0.0)) for f in self.features}
                 amount = float(row.get("Amount Received", row.get("Amount Paid", 0.0)))
             else:
-                amt_received = float(row.get("Amount Received", 1000.0))
-                amt_paid = float(row.get("Amount Paid", amt_received))
+                amt_received = float(amt_rec_arr[idx])
+                amt_paid = float(amt_paid_arr[idx])
                 amount = amt_received
-                same_bank = 1.0 if str(row.get("From Bank", "A")) == str(row.get("To Bank", "B")) else 0.0
-                cross_bank = 1.0 if same_bank == 0.0 else 0.0
-                ts_dt = pd.to_datetime(ts_str, errors="coerce")
-                hour = ts_dt.hour if pd.notna(ts_dt) else 12
-                time_cat = 0.0 if hour < 6 else (1.0 if hour < 12 else (2.0 if hour < 18 else 3.0))
-                is_weekend = 1.0 if (pd.notna(ts_dt) and ts_dt.dayofweek >= 5) else 0.0
-                same_curr = 1.0 if str(row.get("Receiving Currency", "USD")) == str(row.get("Payment Currency", "USD")) else 0.0
 
                 s_state = state_store.get(from_acc).as_vector(ts_sec)
                 r_state = state_store.get(to_acc).as_vector(ts_sec)
@@ -264,15 +296,15 @@ class ModelService:
                 feat_dict = {
                     "Amount Received": amt_received,
                     "Amount Paid": amt_paid,
-                    "Amount Difference": abs(amt_received - amt_paid),
-                    "Amount Ratio": amt_received / max(amt_paid, 1e-4),
-                    "Same Bank Transaction": same_bank,
-                    "Cross Bank Transaction": cross_bank,
-                    "Transaction Time Category": time_cat,
-                    "Is Weekend": is_weekend,
-                    "Log Amount Received": float(np.log1p(amt_received)),
-                    "Log Amount Paid": float(np.log1p(amt_paid)),
-                    "Same Currency": same_curr,
+                    "Amount Difference": float(amt_diff_arr[idx]),
+                    "Amount Ratio": float(amt_ratio_arr[idx]),
+                    "Same Bank Transaction": float(same_bank_arr[idx]),
+                    "Cross Bank Transaction": float(cross_bank_arr[idx]),
+                    "Transaction Time Category": float(time_cat_arr[idx]),
+                    "Is Weekend": float(is_weekend_arr[idx]),
+                    "Log Amount Received": float(log_rec_arr[idx]),
+                    "Log Amount Paid": float(log_paid_arr[idx]),
+                    "Same Currency": float(same_curr_arr[idx]),
                     "sender_in_count": s_state[0],
                     "sender_out_count": s_state[1],
                     "sender_total_count": s_state[2],
@@ -304,10 +336,8 @@ class ModelService:
 
             # Determine probability
             precomputed_prob = None
-            if has_scores:
-                raw_s = row.get("risk_score", row.get("score"))
-                if pd.notna(raw_s):
-                    precomputed_prob = float(raw_s)
+            if scores_arr is not None:
+                precomputed_prob = float(scores_arr[idx])
 
             should_run_attention = (precomputed_prob is None) or (precomputed_prob >= self.threshold and attention_runs < max_attention_runs)
 
@@ -402,7 +432,7 @@ class ModelService:
                 evidence_points.append(f"Discrepancy of ${feat_dict['Amount Difference']:,.2f} between amount received and paid.")
 
             # Ground truth label if present in upload
-            ground_truth = int(row["Is Laundering"]) if "Is Laundering" in row and pd.notna(row["Is Laundering"]) else None
+            ground_truth = int(ground_truth_arr[idx]) if (ground_truth_arr is not None and pd.notna(ground_truth_arr[idx])) else None
 
             results.append({
                 "id": f"tx_{idx + 1:04d}",

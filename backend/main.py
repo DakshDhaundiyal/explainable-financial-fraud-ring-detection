@@ -360,11 +360,28 @@ def run_batch_analysis(payload: BatchRunRequest):
 
 
 @app.post("/api/analysis/run-stream")
-async def run_batch_analysis_stream(payload: BatchRunRequest):
-    """Execute causal batch TGAT scoring with real-time streaming progress events."""
+async def run_batch_analysis_stream(request: Request):
+    """Execute causal batch TGAT scoring with real-time streaming progress events.
+    Supports both direct binary multipart/form-data streaming and JSON payloads.
+    """
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        uploaded_file = form.get("file")
+        if not uploaded_file:
+            raise HTTPException(status_code=400, detail="No file uploaded.")
+        content = await uploaded_file.read()
+        filename = getattr(uploaded_file, "filename", "upload.csv") or "upload.csv"
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        content = body.get("csv_content", "").encode("utf-8")
+        filename = body.get("filename", "upload.csv")
+
     async def event_generator():
         try:
-            content = payload.csv_content.encode("utf-8")
             size_mb = len(content) / (1024 * 1024)
             yield json.dumps({
                 "percent": 5,
@@ -372,7 +389,7 @@ async def run_batch_analysis_stream(payload: BatchRunRequest):
                 "processed": 0,
                 "total": 0,
             }) + "\n"
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.005)
 
             yield json.dumps({
                 "percent": 15,
@@ -380,9 +397,9 @@ async def run_batch_analysis_stream(payload: BatchRunRequest):
                 "processed": 0,
                 "total": 0,
             }) + "\n"
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.005)
 
-            val_result, valid_df = detect_and_validate_csv(content, filename=payload.filename)
+            val_result, valid_df = detect_and_validate_csv(content, filename=filename)
             if not val_result.valid or valid_df is None or len(valid_df) == 0:
                 detail_msg = val_result.errors[0].message if val_result.errors else "Uploaded file failed validation."
                 yield json.dumps({
@@ -398,7 +415,7 @@ async def run_batch_analysis_stream(payload: BatchRunRequest):
                 "processed": 0,
                 "total": total_txs,
             }) + "\n"
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.005)
 
             ms = get_model_service()
             progress_queue = asyncio.Queue()
@@ -441,10 +458,10 @@ async def run_batch_analysis_stream(payload: BatchRunRequest):
                 "processed": total_txs,
                 "total": total_txs,
             }) + "\n"
-            await asyncio.sleep(0.02)
+            await asyncio.sleep(0.005)
 
             session = analysis_store.add_session(
-                filename=payload.filename,
+                filename=filename,
                 transactions=scored_records,
                 threshold=ms.threshold,
                 warnings=val_result.warnings,
@@ -545,7 +562,12 @@ def get_analysis_overview(session_id: Optional[str] = Query(None)):
             "message": "No transaction analyses run yet. Upload a transaction CSV to begin.",
         }
 
-    top_flagged = [t for t in session.transactions if t["classification"] == "FLAGGED"][:5]
+    top_flagged = []
+    for t in session.transactions:
+        if t.get("classification") == "FLAGGED":
+            top_flagged.append(t)
+            if len(top_flagged) >= 5:
+                break
 
     overview_payload = {
         "session_id": session.session_id,
