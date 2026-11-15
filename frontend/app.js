@@ -120,7 +120,6 @@ function initStartActions() {
   const dropzone = document.getElementById('dropzone-box');
   const sizeEllipticBtn = document.getElementById('demo-size-elliptic');
   const sizeIbmBtn = document.getElementById('demo-size-ibm');
-  const sizeSubgraphBtn = document.getElementById('demo-size-subgraph');
   const runDemoText = document.getElementById('run-demo-text');
   const demoTimeHint = document.getElementById('demo-time-hint');
 
@@ -129,7 +128,6 @@ function initStartActions() {
       state.demoBatchSize = 'elliptic';
       sizeEllipticBtn.classList.add('active');
       if (sizeIbmBtn) sizeIbmBtn.classList.remove('active');
-      if (sizeSubgraphBtn) sizeSubgraphBtn.classList.remove('active');
       if (runDemoText) runDemoText.textContent = 'Explore Elliptic++ Bitcoin Network';
       if (demoTimeHint) demoTimeHint.textContent = 'Full 203,769 transactions across 49 time steps. Fast-loads Yellow & Red rings.';
     });
@@ -140,20 +138,8 @@ function initStartActions() {
       state.demoBatchSize = 'ibm';
       sizeIbmBtn.classList.add('active');
       if (sizeEllipticBtn) sizeEllipticBtn.classList.remove('active');
-      if (sizeSubgraphBtn) sizeSubgraphBtn.classList.remove('active');
       if (runDemoText) runDemoText.textContent = 'Explore IBM AML Benchmark';
       if (demoTimeHint) demoTimeHint.textContent = 'Full multi-bank dataset with 282,877 transactions and 301 verified laundering rings.';
-    });
-  }
-
-  if (sizeSubgraphBtn) {
-    sizeSubgraphBtn.addEventListener('click', () => {
-      state.demoBatchSize = 'subgraph';
-      sizeSubgraphBtn.classList.add('active');
-      if (sizeEllipticBtn) sizeEllipticBtn.classList.remove('active');
-      if (sizeIbmBtn) sizeIbmBtn.classList.remove('active');
-      if (runDemoText) runDemoText.textContent = 'Explore Elliptic++ Laundering Subgraph';
-      if (demoTimeHint) demoTimeHint.textContent = 'All 4,545 confirmed illicit nodes and their 1-hop counterparties with interactive force simulation.';
     });
   }
 

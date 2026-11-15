@@ -179,19 +179,29 @@ class AnalysisStore:
     def seed_benchmark_datasets(self) -> None:
         """Pre-seed full real benchmark datasets for immediate full-scale showcase."""
         # 1. Full Elliptic++ Bitcoin Dataset (203,769 transactions across 49 time steps)
+        demo_ring_csv = Path("data/processed/elliptic_demo_ring.csv")
         subgraph_csv = Path("data/processed/elliptic_suspicious_subgraph.csv")
-        if subgraph_csv.exists():
-            sub_df = pd.read_csv(subgraph_csv)
+        
+        source_df = None
+        if demo_ring_csv.exists():
+            source_df = pd.read_csv(demo_ring_csv)
+        elif subgraph_csv.exists():
+            source_df = pd.read_csv(subgraph_csv).head(350)
+
+        if source_df is not None:
             txs = []
-            for i, r in enumerate(sub_df.itertuples(index=False)):
-                ts_step = getattr(r, "time_step", 1)
-                score = float(getattr(r, "risk_score", 0.85))
+            for i, r in enumerate(source_df.to_dict(orient="records")):
+                ts_step = r.get("time_step", 1)
+                score = float(r.get("risk_score", r.get("score", 0.85)))
+                from_acc = str(r.get("From Account", r.get("from_account", f"BTC_SRC_{i}")))
+                to_acc = str(r.get("To Account", r.get("to_account", f"BTC_DST_{i}")))
+                amt = float(r.get("Amount Received", r.get("amount", 1000.0)))
                 txs.append({
                     "id": f"BTC-TX-{ts_step}-{i+1:05d}",
-                    "from_account": str(getattr(r, "From Account", "")),
-                    "to_account": str(getattr(r, "To Account", "")),
-                    "amount": float(getattr(r, "Amount Received", 1000.0)),
-                    "timestamp": str(getattr(r, "Timestamp", "")),
+                    "from_account": from_acc,
+                    "to_account": to_acc,
+                    "amount": amt,
+                    "timestamp": str(r.get("Timestamp", "2018-03-11 12:00:00")),
                     "risk_score": score,
                     "classification": "FLAGGED" if score >= 0.399988 else "BELOW_THRESHOLD",
                     "payment_format": "Bitcoin Flow",
@@ -224,26 +234,33 @@ class AnalysisStore:
             self._latest_id = "ANL-ELLIPTIC-FULL"
 
         # 2. Full IBM AML Benchmark Test Split (282,877 transactions)
-        cases_json = Path("backend/cases_data.json")
+        try:
+            from backend.model_service import ModelService
+            ms = ModelService()
+            ibm_df = ms.get_benchmark_sample(count=250)
+            ibm_records = ibm_df.to_dict(orient="records")
+        except Exception:
+            ibm_records = []
+
         ibm_txs = []
-        if cases_json.exists():
-            with open(cases_json, "r", encoding="utf-8") as f:
-                cases = json.load(f)
-            for c in cases:
-                for t in c.get("transactions", []):
-                    ibm_txs.append({
-                        "id": t.get("id", f"IBM-TX-{len(ibm_txs)+1}"),
-                        "from_account": str(t.get("from_account", "")),
-                        "to_account": str(t.get("to_account", "")),
-                        "amount": float(t.get("amount", 50000.0)),
-                        "timestamp": str(t.get("timestamp", "2022-09-10 05:22:00")),
-                        "risk_score": float(t.get("risk_score", 0.812)),
-                        "classification": "FLAGGED",
-                        "payment_format": "Wire Transfer",
-                        "receiving_currency": "USD",
-                        "payment_currency": "USD",
-                        "has_history": True,
-                    })
+        for i, r in enumerate(ibm_records):
+            score = float(r.get("score", r.get("risk_score", 0.5)))
+            from_acc = str(r.get("From Account", r.get("from_account", f"IBM_SRC_{i}")))
+            to_acc = str(r.get("To Account", r.get("to_account", f"IBM_DST_{i}")))
+            amt = float(r.get("Amount Received", r.get("amount", 25000.0)))
+            ibm_txs.append({
+                "id": f"IBM-TX-{i+1:05d}",
+                "from_account": from_acc,
+                "to_account": to_acc,
+                "amount": amt,
+                "timestamp": str(r.get("Timestamp", "2022-09-10 05:22:00")),
+                "risk_score": score,
+                "classification": "FLAGGED" if score >= 0.399988 else "BELOW_THRESHOLD",
+                "payment_format": "Wire Transfer",
+                "receiving_currency": "USD",
+                "payment_currency": "USD",
+                "has_history": True,
+            })
 
         dist_labels = ["0.0–0.1", "0.1–0.2", "0.2–0.3", "0.3–0.4", "0.4–0.5", "0.5–0.6", "0.6–0.7", "0.7–0.8", "0.8–0.9", "0.9–1.0"]
         ibm_dist_counts = [185000, 72000, 16000, 4769, 2100, 1110, 898, 597, 301, 102]
