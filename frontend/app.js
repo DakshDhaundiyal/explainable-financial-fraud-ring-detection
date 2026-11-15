@@ -9,7 +9,7 @@ const state = {
   activeTab: 'tab-detect-content',
   detectState: 'A', // 'A' = Start, 'B' = Results
   currentSessionId: null,
-  sessionThreshold: 0.737155,
+  sessionThreshold: 0.399988,
   sessionData: null,
   selectedAccountId: null,
   activeSubtab: 'why',
@@ -100,7 +100,7 @@ async function checkInitialSession() {
     const data = await res.json();
     if (data.has_data && data.session_id) {
       state.currentSessionId = data.session_id;
-      state.sessionThreshold = data.threshold || 0.737155;
+      state.sessionThreshold = data.threshold || 0.399988;
       renderResultsState(data);
     }
   } catch (err) {
@@ -210,7 +210,7 @@ async function runDemoBatch(count = 1000) {
 
     const runData = await runRes.json();
     state.currentSessionId = runData.session_id;
-    state.sessionThreshold = runData.threshold || 0.737155;
+    state.sessionThreshold = runData.threshold || 0.399988;
 
     // Load full session overview
     const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(runData.session_id)}`);
@@ -271,7 +271,7 @@ async function handleFileUpload(file) {
 
       const runData = await runRes.json();
       state.currentSessionId = runData.session_id;
-      state.sessionThreshold = runData.threshold || 0.737155;
+      state.sessionThreshold = runData.threshold || 0.399988;
 
       const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(runData.session_id)}`);
       const ovData = await ovRes.json();
@@ -346,7 +346,7 @@ function renderResultsState(data) {
   const flagged = data.flagged_transactions || 0;
   const normal = Math.max(0, total - flagged);
   const duration = data.duration_seconds ? Number(data.duration_seconds).toFixed(2) : '0.58';
-  const thresh = Number(data.threshold || 0.737155);
+  const thresh = Number(data.threshold || 0.399988);
 
   if (batchPill) {
     if (data.distinct_accounts && data.distinct_accounts >= 500) {
@@ -504,7 +504,7 @@ function initGraphSlider() {
     chipWatch.addEventListener('click', () => setGraphRiskFilter(0.40));
   }
   if (chipAlert) {
-    chipAlert.addEventListener('click', () => setGraphRiskFilter(state.sessionThreshold || 0.737155));
+    chipAlert.addEventListener('click', () => setGraphRiskFilter(state.sessionThreshold || 0.399988));
   }
 }
 
@@ -547,7 +547,7 @@ function updateGraphFilterUI() {
 
   if (chipAll) chipAll.classList.toggle('active', val === 0);
   if (chipWatch) chipWatch.classList.toggle('active', Math.abs(val - 0.40) < 0.02);
-  if (chipAlert) chipAlert.classList.toggle('active', Math.abs(val - (state.sessionThreshold || 0.737155)) < 0.03);
+  if (chipAlert) chipAlert.classList.toggle('active', Math.abs(val - (state.sessionThreshold || 0.399988)) < 0.03);
 }
 
 async function loadGraphTopology() {
@@ -570,7 +570,7 @@ async function loadGraphTopology() {
     const cy = height / 2;
 
     // Detect Coordinated Fraud Ring structure (8091-series hub, perimeter mules, and off-ramp)
-    const thresh = state.sessionThreshold || 0.737155;
+    const thresh = state.sessionThreshold || 0.399988;
     
     // Find aggregator hub (8091C4A00 or node with most high-risk connections)
     let hubNode = rawNodes.find((n) => n.id === '8091C4A00');
@@ -1534,17 +1534,17 @@ async function loadComparisonMetrics() {
     const models = [
       {
         id: 'tgat',
-        name: 'TGAT',
-        tag: 'Our model',
+        name: 'TGAT v3',
+        tag: 'Our model (v3)',
         isOur: true,
-        summary: 'Reads the whole network of accounts and how it changes over time.',
+        summary: 'Reads the whole network of accounts and exact timing with log1p continuous time encoding.',
         seesNetwork: 'Yes',
         seesTiming: 'Yes',
-        recall: tgatFrozen.recall || 0.91,
-        precision: tgatFrozen.precision || 0.045,
-        f1: tgatFrozen.f1 || 0.0504,
-        rocAuc: tgatFrozen.roc_auc || 0.9022,
-        fpr: tgatFrozen.false_positive_rate || 0.00126,
+        recall: tgatFrozen.recall || 0.1229,
+        precision: tgatFrozen.precision || 0.0584,
+        f1: tgatFrozen.f1 || 0.0791,
+        rocAuc: tgatFrozen.roc_auc || 0.8969,
+        fpr: tgatFrozen.false_positive_rate || 0.00211,
       },
       {
         id: 'xgboost',

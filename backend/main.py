@@ -98,7 +98,7 @@ def health():
     return {
         "status": "healthy",
         "service": "Explainable TGAT Fraud Detection Engine",
-        "model_architecture": "Temporal Graph Attention Network (TGAT)",
+        "model_architecture": "Temporal Graph Attention Network (TGAT v3, log1p TimeEncoder)",
         "device": str(ms.device),
         "feature_dim": len(ms.features),
         "frozen_threshold": ms.threshold,
@@ -140,9 +140,9 @@ def get_metrics():
             "test_rows": 282877,
             "future_rows": 223,
             "test_positives": 301,
-            "frozen_threshold": 0.737155,
-            "precision_gain": "+138% (1.91% -> 4.55%)",
-            "false_positive_reduction": "-83.8% (2,198 -> 357)",
+            "frozen_threshold": 0.399988,
+            "precision_gain": "+541% vs XGBoost (0.91% -> 5.84%)",
+            "false_positive_reduction": "-63.7% vs XGBoost (1,645 -> 597)",
         }
     }
 
@@ -166,9 +166,9 @@ def get_threshold_details():
         "sweep_sample": sweep_data,
         "operational_tradeoff": {
             "default_threshold": 0.50,
-            "optimal_threshold": 0.737155,
-            "fp_reduction_percent": 83.76,
-            "precision_boost_percent": 138.2,
+            "optimal_threshold": 0.399988,
+            "fp_reduction_percent": 63.71,
+            "precision_boost_percent": 541.3,
         }
     }
 
@@ -485,7 +485,7 @@ def get_account_detail(session_id: str, account_id: str):
         raise HTTPException(status_code=404, detail="Account not found in analysis session.")
 
     session = analysis_store.get_session(session_id)
-    thresh = session.threshold if session else 0.737155
+    thresh = session.threshold if session else 0.399988
     explanation = explain_account_network(acc, session_threshold=thresh)
     acc["ai_narrative"] = explanation.get("narrative", "")
     acc["ai_model_used"] = explanation.get("model_used", "AI Explainer")
@@ -501,7 +501,7 @@ def ask_account_question_endpoint(session_id: str, account_id: str, payload: Acc
         raise HTTPException(status_code=404, detail="Account not found in analysis session.")
 
     session = analysis_store.get_session(session_id)
-    thresh = session.threshold if session else 0.737155
+    thresh = session.threshold if session else 0.399988
     return answer_account_question(acc, payload.question, session_threshold=thresh)
 
 

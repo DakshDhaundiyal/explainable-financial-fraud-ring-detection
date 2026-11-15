@@ -48,7 +48,7 @@ class TestAnalysisWorkflow(unittest.TestCase):
         self.assertEqual(run_data["status"], "success")
         session_id = run_data["session_id"]
         self.assertEqual(run_data["total_transactions"], 15)
-        self.assertAlmostEqual(run_data["threshold"], 0.737155, places=4)
+        self.assertAlmostEqual(run_data["threshold"], 0.399988, places=4)
 
         # Check Overview
         ov_res = self.client.get(f"/api/analysis/overview?session_id={session_id}")

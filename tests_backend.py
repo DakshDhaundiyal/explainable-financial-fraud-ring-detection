@@ -16,7 +16,7 @@ class TestTGATBackend(unittest.TestCase):
         data = res.json()
         self.assertEqual(data["status"], "healthy")
         self.assertEqual(data["feature_dim"], 26)
-        self.assertAlmostEqual(data["frozen_threshold"], 0.737155, places=4)
+        self.assertAlmostEqual(data["frozen_threshold"], 0.399988, places=4)
 
     def test_metrics_endpoint(self):
         res = self.client.get("/api/metrics")
@@ -28,15 +28,15 @@ class TestTGATBackend(unittest.TestCase):
         self.assertIn("static_gcn", data["baselines"])
         self.assertIn("xgboost", data["baselines"])
         self.assertIn("temporal_xgboost", data["baselines"])
-        self.assertAlmostEqual(data["tgat_frozen_test"]["roc_auc"], 0.9022, places=3)
-        self.assertAlmostEqual(data["tgat_frozen_test"]["pr_auc"], 0.0184, places=3)
+        self.assertAlmostEqual(data["tgat_frozen_test"]["roc_auc"], 0.8969, places=3)
+        self.assertAlmostEqual(data["tgat_frozen_test"]["pr_auc"], 0.0221, places=3)
 
     def test_threshold_endpoint(self):
         res = self.client.get("/api/threshold")
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertIn("frozen", data)
-        self.assertAlmostEqual(data["frozen"]["threshold"], 0.737155, places=4)
+        self.assertAlmostEqual(data["frozen"]["threshold"], 0.399988, places=4)
         self.assertTrue(len(data["sweep_sample"]) > 0)
 
     def test_cases_endpoint(self):
@@ -94,7 +94,7 @@ class TestTGATBackend(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data["decision"], "LEGITIMATE_CLEAR")
-        self.assertLess(data["probability"], 0.737155)
+        self.assertLess(data["probability"], 0.399988)
 
     def test_frontend_static_serving(self):
         res = self.client.get("/")

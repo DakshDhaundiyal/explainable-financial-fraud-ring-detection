@@ -44,7 +44,7 @@ class ModelService:
             t_data = json.load(f)
         self.threshold = float(t_data["threshold"])
 
-        # 3. Load Model Checkpoint
+        # 3. Load Model Checkpoint (TGAT v3 with log1p continuous time encoding)
         self.model = TGATTransactionModel(
             transaction_dim=len(self.features),
             event_dim=len(self.features),
@@ -54,6 +54,7 @@ class ModelService:
             dropout=0.2,
             num_layers=2,
             use_time_encoding=True,
+            time_encoding_mode="log1p_seconds",
         ).to(self.device)
 
         state = torch.load(checkpoint_path, map_location=self.device, weights_only=True)

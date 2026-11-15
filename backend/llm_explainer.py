@@ -185,7 +185,7 @@ def _generate_synthetic_network_narrative(context: Dict[str, Any]) -> str:
     )
 
 
-def explain_account_network(acc_data: Dict[str, Any], session_threshold: float = 0.737155) -> Dict[str, Any]:
+def explain_account_network(acc_data: Dict[str, Any], session_threshold: float = 0.399988) -> Dict[str, Any]:
     """Generate plain-English investigation narrative covering the account and its connected counterparties."""
     account_id = acc_data.get("account_id", "UNKNOWN")
     session_id = acc_data.get("session_id", "default")
@@ -243,7 +243,7 @@ def explain_account_network(acc_data: Dict[str, Any], session_threshold: float =
     return result
 
 
-def answer_account_question(acc_data: Dict[str, Any], question: str, session_threshold: float = 0.737155) -> Dict[str, Any]:
+def answer_account_question(acc_data: Dict[str, Any], question: str, session_threshold: float = 0.399988) -> Dict[str, Any]:
     """Answer a user's follow-up question regarding the account and its connected accounts."""
     context = _build_network_context(acc_data, session_threshold)
     account_id = acc_data.get("account_id", "UNKNOWN")
@@ -311,7 +311,7 @@ def explain_batch_overview(session_data: Dict[str, Any]) -> Dict[str, Any]:
     total = session_data.get("total_transactions", 0)
     flagged = session_data.get("flagged_transactions", 0)
     high_accs = session_data.get("high_risk_accounts", 0)
-    thresh = float(session_data.get("threshold", 0.737155))
+    thresh = float(session_data.get("threshold", 0.399988))
 
     client = _get_gemini_client()
     briefing_text = None
