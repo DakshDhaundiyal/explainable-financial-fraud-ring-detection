@@ -117,7 +117,6 @@ This project utilizes the **IBM Anti-Money Laundering (AML) Transaction Dataset*
 Unlike conventional fraud datasets, the IBM AML dataset naturally represents a financial transaction network, making it highly suitable for graph learning.
 
 ---
-
 # Graph Representation
 
 Instead of representing the data as independent rows, the complete transaction history is transformed into a graph.
