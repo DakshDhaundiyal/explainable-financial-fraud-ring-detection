@@ -17,7 +17,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024  # 500 MB
-MAX_UPLOAD_ROWS = 10000  # Safe micro-batch processing limit for demo-ready responsiveness
+MAX_UPLOAD_ROWS = 250000  # Support full-scale datasets up to 250,000 transactions without micro-batch caps
 
 RAW_IBM_AML_COLUMNS = [
     "Timestamp",

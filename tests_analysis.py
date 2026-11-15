@@ -115,6 +115,45 @@ class TestAnalysisWorkflow(unittest.TestCase):
         self.assertIn("Risk_Score", exp_res.text)
         self.assertIn("Classification", exp_res.text)
 
+    def test_benchmark_elliptic_and_ibm_switching(self):
+        # 1. Switch to Elliptic++
+        res_el = self.client.post("/api/analysis/switch-dataset?dataset=elliptic")
+        self.assertEqual(res_el.status_code, 200)
+        data_el = res_el.json()
+        self.assertEqual(data_el["session_id"], "ANL-ELLIPTIC-FULL")
+        self.assertEqual(data_el["total_transactions"], 203769)
+        self.assertEqual(data_el["flagged_transactions"], 4545)
+
+        # Overview should return Elliptic++
+        ov_el = self.client.get("/api/analysis/overview")
+        self.assertEqual(ov_el.status_code, 200)
+        ov_data = ov_el.json()
+        self.assertEqual(ov_data["session_id"], "ANL-ELLIPTIC-FULL")
+        self.assertEqual(ov_data["total_transactions"], 203769)
+        self.assertEqual(ov_data["flagged_transactions"], 4545)
+        self.assertIn("Elliptic++", ov_data["filename"])
+
+        # Graph should return nodes and edges
+        graph_el = self.client.get("/api/analysis/ANL-ELLIPTIC-FULL/graph")
+        self.assertEqual(graph_el.status_code, 200)
+        graph_data = graph_el.json()
+        self.assertTrue(len(graph_data["nodes"]) > 0)
+        self.assertTrue(len(graph_data["edges"]) > 0)
+
+        # 2. Switch to IBM AML
+        res_ibm = self.client.post("/api/analysis/switch-dataset?dataset=ibm")
+        self.assertEqual(res_ibm.status_code, 200)
+        data_ibm = res_ibm.json()
+        self.assertEqual(data_ibm["session_id"], "ANL-IBM-FULL")
+        self.assertEqual(data_ibm["total_transactions"], 282877)
+
+        # Overview should now return IBM
+        ov_ibm = self.client.get("/api/analysis/overview")
+        self.assertEqual(ov_ibm.status_code, 200)
+        ov_ibm_data = ov_ibm.json()
+        self.assertEqual(ov_ibm_data["session_id"], "ANL-IBM-FULL")
+        self.assertEqual(ov_ibm_data["total_transactions"], 282877)
+
 
 if __name__ == "__main__":
     unittest.main()

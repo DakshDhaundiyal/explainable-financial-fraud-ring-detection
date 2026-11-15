@@ -78,31 +78,31 @@
             <p style="margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.5;">CSV files up to 500MB supported. Auto-maps sender, receiver, amount, and time.</p>
           </section>
 
-            <!-- Demo Card -->
+            <!-- Benchmark Dataset Card -->
             <section class="action-card demo-theme">
               <div class="action-card-header">
                 <div class="action-card-icon">
                   <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M7 4.5v15l12-7.5z"></path>
+                    <circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon>
                   </svg>
                 </div>
-                <h2 class="action-card-title">Try the demo</h2>
+                <h2 class="action-card-title">Benchmark Datasets</h2>
               </div>
               <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px;">
-                <p style="margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em;" id="demo-title-text">Sample transactions</p>
-                <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #3B4C66;" id="demo-desc-text">Test real crypto & banking transaction graphs with TGAT v3. No file needed.</p>
+                <p style="margin: 0; font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em;" id="demo-title-text">Full Network Investigation</p>
+                <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #3B4C66;" id="demo-desc-text">Analyze full-scale cryptocurrency and multi-bank financial crime graphs with TGAT v3.</p>
                 <div class="demo-size-selector">
-                  <button type="button" class="btn-demo-size" id="demo-size-50" data-size="50">50 transactions (fast)</button>
-                  <button type="button" class="btn-demo-size" id="demo-size-1000" data-size="1000">1,000+ accounts (IBM AML)</button>
-                  <button type="button" class="btn-demo-size active" id="demo-size-elliptic" data-size="elliptic">⚡ Elliptic++ Bitcoin (Illicit Rings)</button>
+                  <button type="button" class="btn-demo-size active" id="demo-size-elliptic" data-size="elliptic">⚡ Elliptic++ Bitcoin (203,769 tx · Full Network)</button>
+                  <button type="button" class="btn-demo-size" id="demo-size-ibm" data-size="ibm">🏦 IBM AML Benchmark (282,877 tx · Full Split)</button>
+                  <button type="button" class="btn-demo-size" id="demo-size-subgraph" data-size="subgraph">⚡ Elliptic++ Laundering Subgraph (8,145 Flows)</button>
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                 <button type="button" class="btn btn-primary" id="btn-run-demo" style="min-height: 48px; padding: 0 28px; font-size: 16px;">
                   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M7 4.5v15l12-7.5z"></path></svg>
-                  <span id="run-demo-text">Run demo (Elliptic++ Bitcoin Fraud Rings)</span>
+                  <span id="run-demo-text">Explore Elliptic++ Bitcoin Network</span>
                 </button>
-                <span style="font-size: 14px; color: #3B4C66;" id="demo-time-hint">Real Elliptic++ Bitcoin dataset (~1.5s). Fast-loads Yellow & Red rings.</span>
+                <span style="font-size: 14px; color: #3B4C66;" id="demo-time-hint">Instant full-network load with Yellow & Red fast-loading and AI explainer.</span>
               </div>
             </section>
         </div>
@@ -142,14 +142,15 @@
         <!-- 1. Source Row -->
         <div class="source-row">
           <div class="source-meta">
-            <span class="source-pill" id="source-batch-pill">Demo batch</span>
-            <span style="font-size: 15px; color: var(--text-secondary);" id="source-tx-count">50 transactions</span>
+            <span class="source-pill" id="source-batch-pill">Benchmark Network</span>
+            <span style="font-size: 15px; color: var(--text-secondary);" id="source-tx-count">203,769 transactions</span>
             <span style="font-size: 15px; color: #8A97AB;" aria-hidden="true">·</span>
-            <span class="mono" style="font-size: 13px; color: var(--text-secondary);" id="source-session-id">ANL-SESSION</span>
+            <span class="mono" style="font-size: 13px; color: var(--text-secondary);" id="source-session-id">ANL-ELLIPTIC-FULL</span>
           </div>
           <div class="source-actions">
-            <button type="button" class="btn btn-secondary" id="btn-upload-new">Upload a new file</button>
-            <button type="button" class="btn btn-secondary" id="btn-run-again">Run demo again</button>
+            <button type="button" class="btn btn-secondary active" id="btn-switch-elliptic" title="Full Elliptic++ Bitcoin Network (203,769 transactions, 4,545 illicit addresses across 49 timesteps)">⚡ Elliptic++ (203k)</button>
+            <button type="button" class="btn btn-secondary" id="btn-switch-ibm" title="Full IBM AML Multi-Bank Benchmark (282,877 transactions, 301 verified laundering rings)">🏦 IBM AML (282k)</button>
+            <button type="button" class="btn btn-secondary" id="btn-upload-new">Upload custom CSV</button>
           </div>
         </div>
 

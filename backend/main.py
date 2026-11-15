@@ -397,10 +397,38 @@ def get_sample_benchmark_data(
         raise HTTPException(status_code=500, detail=f"Failed to generate sample: {str(e)}")
 
 
+@app.post("/api/analysis/switch-dataset")
+def switch_active_dataset(dataset: str = Query("elliptic")):
+    """Switch active full benchmark dataset (elliptic or ibm)."""
+    sess_id = "ANL-ELLIPTIC-FULL" if "elliptic" in dataset.lower() else "ANL-IBM-FULL"
+    sess = analysis_store.get_session(sess_id)
+    if not sess:
+        analysis_store.seed_benchmark_datasets()
+        sess = analysis_store.get_session(sess_id)
+    if sess:
+        analysis_store._latest_id = sess_id
+        return {
+            "status": "success",
+            "session_id": sess.session_id,
+            "filename": sess.filename,
+            "total_transactions": sess.total_transactions,
+            "flagged_transactions": sess.flagged_transactions,
+            "flagged_rate": sess.flagged_rate,
+            "distinct_accounts": sess.distinct_accounts,
+            "threshold": sess.threshold,
+            "duration_seconds": sess.duration_seconds,
+        }
+    raise HTTPException(status_code=404, detail="Dataset not found.")
+
+
 @app.get("/api/analysis/overview")
 def get_analysis_overview(session_id: Optional[str] = Query(None)):
     """Return summary statistics, histogram distribution, and top flagged alerts for selected analysis."""
     session = analysis_store.get_session(session_id)
+    if not session:
+        analysis_store.seed_benchmark_datasets()
+        session = analysis_store.get_session("ANL-ELLIPTIC-FULL")
+
     if not session:
         return {
             "has_data": False,

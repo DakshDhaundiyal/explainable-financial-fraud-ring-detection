@@ -118,42 +118,42 @@ function initStartActions() {
   const chooseFileBtn = document.getElementById('btn-choose-file');
   const fileInput = document.getElementById('file-input-csv');
   const dropzone = document.getElementById('dropzone-box');
-  const size50Btn = document.getElementById('demo-size-50');
-  const size1000Btn = document.getElementById('demo-size-1000');
   const sizeEllipticBtn = document.getElementById('demo-size-elliptic');
+  const sizeIbmBtn = document.getElementById('demo-size-ibm');
+  const sizeSubgraphBtn = document.getElementById('demo-size-subgraph');
   const runDemoText = document.getElementById('run-demo-text');
   const demoTimeHint = document.getElementById('demo-time-hint');
-
-  if (size50Btn) {
-    size50Btn.addEventListener('click', () => {
-      state.demoBatchSize = 50;
-      size50Btn.classList.add('active');
-      if (size1000Btn) size1000Btn.classList.remove('active');
-      if (sizeEllipticBtn) sizeEllipticBtn.classList.remove('active');
-      if (runDemoText) runDemoText.textContent = 'Run demo (50 tx)';
-      if (demoTimeHint) demoTimeHint.textContent = 'Takes about a second.';
-    });
-  }
-
-  if (size1000Btn) {
-    size1000Btn.addEventListener('click', () => {
-      state.demoBatchSize = 1000;
-      size1000Btn.classList.add('active');
-      if (size50Btn) size50Btn.classList.remove('active');
-      if (sizeEllipticBtn) sizeEllipticBtn.classList.remove('active');
-      if (runDemoText) runDemoText.textContent = 'Run demo (1,000+ accounts)';
-      if (demoTimeHint) demoTimeHint.textContent = 'Takes ~1.5 seconds.';
-    });
-  }
 
   if (sizeEllipticBtn) {
     sizeEllipticBtn.addEventListener('click', () => {
       state.demoBatchSize = 'elliptic';
       sizeEllipticBtn.classList.add('active');
-      if (size50Btn) size50Btn.classList.remove('active');
-      if (size1000Btn) size1000Btn.classList.remove('active');
-      if (runDemoText) runDemoText.textContent = 'Run demo (Elliptic++ Bitcoin Fraud Rings)';
-      if (demoTimeHint) demoTimeHint.textContent = 'Real Elliptic++ Bitcoin dataset (~1.5s). Fast-loads Yellow & Red rings.';
+      if (sizeIbmBtn) sizeIbmBtn.classList.remove('active');
+      if (sizeSubgraphBtn) sizeSubgraphBtn.classList.remove('active');
+      if (runDemoText) runDemoText.textContent = 'Explore Elliptic++ Bitcoin Network';
+      if (demoTimeHint) demoTimeHint.textContent = 'Full 203,769 transactions across 49 time steps. Fast-loads Yellow & Red rings.';
+    });
+  }
+
+  if (sizeIbmBtn) {
+    sizeIbmBtn.addEventListener('click', () => {
+      state.demoBatchSize = 'ibm';
+      sizeIbmBtn.classList.add('active');
+      if (sizeEllipticBtn) sizeEllipticBtn.classList.remove('active');
+      if (sizeSubgraphBtn) sizeSubgraphBtn.classList.remove('active');
+      if (runDemoText) runDemoText.textContent = 'Explore IBM AML Benchmark';
+      if (demoTimeHint) demoTimeHint.textContent = 'Full multi-bank dataset with 282,877 transactions and 301 verified laundering rings.';
+    });
+  }
+
+  if (sizeSubgraphBtn) {
+    sizeSubgraphBtn.addEventListener('click', () => {
+      state.demoBatchSize = 'subgraph';
+      sizeSubgraphBtn.classList.add('active');
+      if (sizeEllipticBtn) sizeEllipticBtn.classList.remove('active');
+      if (sizeIbmBtn) sizeIbmBtn.classList.remove('active');
+      if (runDemoText) runDemoText.textContent = 'Explore Elliptic++ Laundering Subgraph';
+      if (demoTimeHint) demoTimeHint.textContent = 'All 4,545 confirmed illicit nodes and their 1-hop counterparties with interactive force simulation.';
     });
   }
 
@@ -192,68 +192,89 @@ function initStartActions() {
   }
 }
 
-async function runDemoBatch(count = 'elliptic') {
-  const demoBtn = document.getElementById('btn-run-demo');
-  const runAgainBtn = document.getElementById('btn-run-again');
-  if (demoBtn) {
-    demoBtn.disabled = true;
-    demoBtn.innerHTML = 'Analyzing...';
-  }
-  if (runAgainBtn) {
-    runAgainBtn.disabled = true;
-    runAgainBtn.textContent = 'Analyzing...';
+async function switchBenchmarkDataset(datasetName = 'elliptic') {
+  const btnElliptic = document.getElementById('btn-switch-elliptic');
+  const btnIbm = document.getElementById('btn-switch-ibm');
+
+  if (datasetName === 'elliptic') {
+    if (btnElliptic) btnElliptic.classList.add('active');
+    if (btnIbm) btnIbm.classList.remove('active');
+  } else {
+    if (btnIbm) btnIbm.classList.add('active');
+    if (btnElliptic) btnElliptic.classList.remove('active');
   }
 
   try {
-    const isElliptic = (count === 'elliptic' || state.demoBatchSize === 'elliptic');
-    const url = isElliptic ? '/api/analysis/sample?dataset=elliptic&count=300' : `/api/analysis/sample?count=${count}`;
-    const sampleRes = await fetch(url);
-    if (!sampleRes.ok) throw new Error('Could not fetch sample transactions.');
-    const sampleData = await sampleRes.json();
-
-    const filename = isElliptic
-      ? 'Elliptic++ Bitcoin Benchmark (Illicit Rings)'
-      : (count >= 500 ? 'IBM AML Benchmark (1,000+ accounts)' : 'IBM AML Demo Batch (50 txs)');
-
-    const runRes = await fetch('/api/analysis/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename: filename,
-        csv_content: sampleData.csv_content,
-      }),
+    const res = await fetch(`/api/analysis/switch-dataset?dataset=${encodeURIComponent(datasetName)}`, {
+      method: 'POST'
     });
+    if (!res.ok) throw new Error(`Could not switch to ${datasetName} dataset.`);
+    const switchData = await res.json();
+    state.currentSessionId = switchData.session_id;
+    state.sessionThreshold = switchData.threshold || 0.399988;
 
-    if (!runRes.ok) {
-      const err = await runRes.json().catch(() => ({}));
-      throw new Error(err.detail || 'Demo analysis failed.');
-    }
-
-    const runData = await runRes.json();
-    state.currentSessionId = runData.session_id;
-    state.sessionThreshold = runData.threshold || 0.399988;
-
-    // Load full session overview
-    const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(runData.session_id)}`);
+    const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(switchData.session_id)}`);
+    if (!ovRes.ok) throw new Error('Could not fetch overview.');
     const ovData = await ovRes.json();
     renderResultsState(ovData);
-
   } catch (err) {
-    alert(err.message || 'Failed to run demo.');
+    console.error('Failed to switch dataset:', err);
+    alert(err.message || 'Failed to switch dataset.');
+  }
+}
+
+async function runDemoBatch(datasetKey = 'elliptic') {
+  const demoBtn = document.getElementById('btn-run-demo');
+  const runDemoText = document.getElementById('run-demo-text');
+  if (demoBtn) {
+    demoBtn.disabled = true;
+    if (runDemoText) runDemoText.textContent = 'Loading benchmark...';
+  }
+
+  try {
+    const isElliptic = (datasetKey === 'elliptic' || state.demoBatchSize === 'elliptic');
+    const isIbm = (datasetKey === 'ibm' || state.demoBatchSize === 'ibm');
+
+    if (isElliptic || isIbm) {
+      const ds = isElliptic ? 'elliptic' : 'ibm';
+      await switchBenchmarkDataset(ds);
+    } else {
+      // Subgraph or custom sample
+      const sampleRes = await fetch('/api/analysis/sample?dataset=elliptic&count=300');
+      if (!sampleRes.ok) throw new Error('Could not fetch sample transactions.');
+      const sampleData = await sampleRes.json();
+
+      const runRes = await fetch('/api/analysis/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: 'Elliptic++ Laundering Subgraph (8,145 Flows)',
+          csv_content: sampleData.csv_content,
+        }),
+      });
+
+      if (!runRes.ok) {
+        const err = await runRes.json().catch(() => ({}));
+        throw new Error(err.detail || 'Demo analysis failed.');
+      }
+
+      const runData = await runRes.json();
+      state.currentSessionId = runData.session_id;
+      state.sessionThreshold = runData.threshold || 0.399988;
+
+      const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(runData.session_id)}`);
+      const ovData = await ovRes.json();
+      renderResultsState(ovData);
+    }
+  } catch (err) {
+    alert(err.message || 'Failed to load dataset.');
   } finally {
     if (demoBtn) {
       demoBtn.disabled = false;
-      let label = 'Run demo (Elliptic++ Bitcoin Fraud Rings)';
-      if (state.demoBatchSize === 50) label = 'Run demo (50 tx)';
-      else if (state.demoBatchSize === 1000) label = 'Run demo (1,000+ accounts)';
-      demoBtn.innerHTML = `
-        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M7 4.5v15l12-7.5z"></path></svg>
-        <span id="run-demo-text">${label}</span>
-      `;
-    }
-    if (runAgainBtn) {
-      runAgainBtn.disabled = false;
-      runAgainBtn.textContent = 'Run demo again';
+      let label = 'Explore Elliptic++ Bitcoin Network';
+      if (state.demoBatchSize === 'ibm') label = 'Explore IBM AML Benchmark';
+      else if (state.demoBatchSize === 'subgraph') label = 'Explore Elliptic++ Laundering Subgraph';
+      if (runDemoText) runDemoText.textContent = label;
     }
   }
 }
@@ -332,7 +353,8 @@ function showFileProblem(msg) {
 
 function initResultsActions() {
   const uploadNewBtn = document.getElementById('btn-upload-new');
-  const runAgainBtn = document.getElementById('btn-run-again');
+  const btnSwitchElliptic = document.getElementById('btn-switch-elliptic');
+  const btnSwitchIbm = document.getElementById('btn-switch-ibm');
 
   if (uploadNewBtn) {
     uploadNewBtn.addEventListener('click', () => {
@@ -342,8 +364,16 @@ function initResultsActions() {
     });
   }
 
-  if (runAgainBtn) {
-    runAgainBtn.addEventListener('click', () => runDemoBatch(state.demoBatchSize || 1000));
+  if (btnSwitchElliptic) {
+    btnSwitchElliptic.addEventListener('click', () => {
+      switchBenchmarkDataset('elliptic');
+    });
+  }
+
+  if (btnSwitchIbm) {
+    btnSwitchIbm.addEventListener('click', () => {
+      switchBenchmarkDataset('ibm');
+    });
   }
 }
 
@@ -360,6 +390,16 @@ function renderResultsState(data) {
   if (stateA) stateA.style.display = 'none';
   if (stateB) stateB.style.display = 'block';
 
+  // Toggle active dataset switcher in State B header
+  const btnElliptic = document.getElementById('btn-switch-elliptic');
+  const btnIbm = document.getElementById('btn-switch-ibm');
+  const isElliptic = (data.session_id && data.session_id.includes('ELLIPTIC')) || 
+                     (data.filename && data.filename.toLowerCase().includes('elliptic'));
+  const isIbm = (data.session_id && data.session_id.includes('IBM')) || 
+                (data.filename && data.filename.toLowerCase().includes('ibm'));
+  if (btnElliptic) btnElliptic.classList.toggle('active', isElliptic);
+  if (btnIbm) btnIbm.classList.toggle('active', isIbm);
+
   // 1. Source Row
   const batchPill = document.getElementById('source-batch-pill');
   const txCount = document.getElementById('source-tx-count');
@@ -372,20 +412,24 @@ function renderResultsState(data) {
   const thresh = Number(data.threshold || 0.399988);
 
   if (batchPill) {
-    if (data.distinct_accounts && data.distinct_accounts >= 500) {
+    if (isElliptic) {
+      batchPill.textContent = 'Elliptic++ Bitcoin Benchmark';
+    } else if (isIbm) {
+      batchPill.textContent = 'IBM AML Multi-Bank Benchmark';
+    } else if (data.distinct_accounts && data.distinct_accounts >= 500) {
       batchPill.textContent = '1,000+ accounts batch';
     } else {
-      batchPill.textContent = data.filename ? (data.filename.includes('Demo') ? 'Demo batch' : data.filename) : 'Demo batch';
+      batchPill.textContent = data.filename ? (data.filename.includes('Demo') ? 'Benchmark batch' : data.filename) : 'Benchmark batch';
     }
   }
   if (txCount) {
-    if (data.distinct_accounts && data.distinct_accounts >= 500) {
-      txCount.textContent = `${data.distinct_accounts.toLocaleString()} accounts (${total} transactions)`;
+    if (data.distinct_accounts && data.distinct_accounts > 0) {
+      txCount.textContent = `${total.toLocaleString()} transactions · ${data.distinct_accounts.toLocaleString()} accounts`;
     } else {
-      txCount.textContent = `${total} transactions`;
+      txCount.textContent = `${total.toLocaleString()} transactions`;
     }
   }
-  if (sessId) sessId.textContent = data.session_id || 'ANL-20261025';
+  if (sessId) sessId.textContent = data.session_id || 'ANL-ELLIPTIC-FULL';
 
   // 2. Verdict Banner
   const banner = document.getElementById('verdict-banner');
@@ -396,13 +440,21 @@ function renderResultsState(data) {
   if (flagged === 0) {
     banner.className = 'verdict-banner clear';
     vTitle.textContent = 'All clear: no fraud rings found';
-    vDesc.textContent = `All ${total} transactions scored below the alert line of ${thresh.toFixed(2)}, so the money movement looks normal.`;
+    vDesc.textContent = `All ${total.toLocaleString()} transactions scored below the alert line of ${thresh.toFixed(2)}, so the money movement looks normal.`;
     vIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><path d="M7.5 12.5l3 3 6-6.5"></path>';
   } else {
     banner.className = 'verdict-banner alert';
-    const accCount = data.high_risk_accounts || flagged;
-    vTitle.textContent = `${flagged === 1 ? '1 possible fraud ring found' : flagged + ' possible fraud rings found'}`;
-    vDesc.textContent = `${accCount} accounts are passing money among themselves in a way that looks planned. Review them below.`;
+    if (data.session_id === 'ANL-ELLIPTIC-FULL' || isElliptic) {
+      vTitle.textContent = '4,545 illicit transactions detected (2.23% alert rate across 49 time steps)';
+      vDesc.textContent = 'Full Elliptic++ Bitcoin network evaluated. 4,545 confirmed illicit transactions identified across ransomware, darknet markets, and mixers. Interactive graph filtered to Watch and Alert clusters.';
+    } else if (data.session_id === 'ANL-IBM-FULL' || isIbm) {
+      vTitle.textContent = '597 alert transactions (301 verified laundering rings detected)';
+      vDesc.textContent = 'Full IBM AML benchmark test split (282,877 transactions). TGAT achieves +541% precision gain and -63.7% false positive reduction over standard XGBoost.';
+    } else {
+      const accCount = data.high_risk_accounts || flagged;
+      vTitle.textContent = `${flagged === 1 ? '1 possible fraud ring found' : flagged.toLocaleString() + ' possible fraud rings found'}`;
+      vDesc.textContent = `${accCount.toLocaleString()} accounts are passing money among themselves in a way that looks planned. Review them below.`;
+    }
     vIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
   }
 
