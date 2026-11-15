@@ -178,6 +178,102 @@ function initStartActions() {
   }
 }
 
+// ============================================================================
+// PROGRESS BAR CONTROLLER (DATASET LOADING & TGAT SCORING)
+// ============================================================================
+
+const progressController = {
+  timer: null,
+  currentPct: 0,
+  targetPct: 0,
+
+  start({ containerId, barId, pctId, stageId, etaId, filename, stages, estimatedMs = 2000 }) {
+    this.stop();
+    this.currentPct = 0;
+    this.targetPct = 5;
+
+    const container = document.getElementById(containerId);
+    const bar = document.getElementById(barId);
+    const pct = document.getElementById(pctId);
+    const stage = document.getElementById(stageId);
+    const eta = document.getElementById(etaId);
+    const fn = document.getElementById('loading-filename-text');
+
+    if (container) container.style.display = 'flex';
+    if (bar) bar.style.width = '5%';
+    if (pct) pct.textContent = '5%';
+    if (fn && filename) fn.textContent = filename;
+
+    const startTime = Date.now();
+    const defaultStages = [
+      { atPct: 10, text: 'Reading and validating CSV rows...' },
+      { atPct: 35, text: 'Auto-mapping schema & building temporal edges...' },
+      { atPct: 60, text: 'Analyzing and scoring with TGAT model (CUDA)...' },
+      { atPct: 80, text: 'Computing dynamic attention weights & risk tiers...' },
+      { atPct: 95, text: 'Finalizing network topology & AI briefing...' },
+    ];
+    const activeStages = stages || defaultStages;
+
+    this.timer = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progressRatio = Math.min(1, elapsed / estimatedMs);
+      
+      // Asymptotic progression towards 96%
+      this.targetPct = Math.min(96, Math.round(5 + (91 * Math.sin(progressRatio * Math.PI / 2))));
+      
+      if (this.currentPct < this.targetPct) {
+        this.currentPct += 1;
+      }
+
+      if (bar) bar.style.width = `${this.currentPct}%`;
+      if (pct) pct.textContent = `${this.currentPct}%`;
+
+      // Update stage text based on current percentage
+      for (let i = activeStages.length - 1; i >= 0; i--) {
+        if (this.currentPct >= activeStages[i].atPct) {
+          if (stage) stage.textContent = activeStages[i].text;
+          break;
+        }
+      }
+
+      // Update ETA
+      if (eta) {
+        const remainingSec = Math.max(0.2, ((estimatedMs - elapsed) / 1000)).toFixed(1);
+        eta.textContent = elapsed < estimatedMs ? `Est. ~${remainingSec}s remaining` : 'Almost done...';
+      }
+    }, 35);
+  },
+
+  async complete({ containerId, barId, pctId, stageId, etaId, onComplete }) {
+    this.stop();
+    const container = document.getElementById(containerId);
+    const bar = document.getElementById(barId);
+    const pct = document.getElementById(pctId);
+    const stage = document.getElementById(stageId);
+    const eta = document.getElementById(etaId);
+
+    if (bar) bar.style.width = '100%';
+    if (pct) pct.textContent = '100%';
+    if (stage) stage.textContent = 'Analysis complete! Loading dashboard...';
+    if (eta) eta.textContent = 'Ready';
+
+    await new Promise((r) => setTimeout(r, 260));
+    if (container) container.style.display = 'none';
+    if (onComplete) onComplete();
+  },
+
+  stop(containerId) {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    if (containerId) {
+      const container = document.getElementById(containerId);
+      if (container) container.style.display = 'none';
+    }
+  }
+};
+
 async function switchBenchmarkDataset(datasetName = 'elliptic') {
   const btnElliptic = document.getElementById('btn-switch-elliptic');
   const btnIbm = document.getElementById('btn-switch-ibm');
@@ -189,6 +285,32 @@ async function switchBenchmarkDataset(datasetName = 'elliptic') {
     if (btnIbm) btnIbm.classList.add('active');
     if (btnElliptic) btnElliptic.classList.remove('active');
   }
+
+  const isStateB = state.detectState === 'B';
+  const loaderContainerId = isStateB ? 'state-b-dataset-loader' : 'global-dataset-loader';
+  const loaderBarId = isStateB ? 'state-b-loader-bar' : 'global-loader-bar';
+  const loaderPctId = isStateB ? 'state-b-loader-pct' : 'global-loader-pct';
+  const loaderStageId = isStateB ? 'state-b-loader-stage' : 'global-loader-stage';
+  const loaderEtaId = isStateB ? null : 'global-loader-eta';
+  const datasetTitle = datasetName === 'elliptic' ? '⚡ Elliptic++ Bitcoin Network (203k tx)' : '🏦 IBM Multi-Bank AML Benchmark (282k tx)';
+
+  const nameEl = document.getElementById('global-loader-dataset-name');
+  if (nameEl) nameEl.textContent = `Dataset: ${datasetTitle}`;
+
+  progressController.start({
+    containerId: loaderContainerId,
+    barId: loaderBarId,
+    pctId: loaderPctId,
+    stageId: loaderStageId,
+    etaId: loaderEtaId,
+    estimatedMs: 1400,
+    stages: [
+      { atPct: 15, text: `Loading ${datasetName === 'elliptic' ? 'Elliptic++ Bitcoin' : 'IBM AML'} network graph...` },
+      { atPct: 45, text: 'Analyzing and scoring with TGAT v3 model (CUDA)...' },
+      { atPct: 75, text: 'Extracting dynamic attention weights & risk tiers...' },
+      { atPct: 95, text: 'Finalizing interactive canvas & AI summary...' },
+    ]
+  });
 
   try {
     const res = await fetch(`/api/analysis/switch-dataset?dataset=${encodeURIComponent(datasetName)}`, {
@@ -202,8 +324,18 @@ async function switchBenchmarkDataset(datasetName = 'elliptic') {
     const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(switchData.session_id)}`);
     if (!ovRes.ok) throw new Error('Could not fetch overview.');
     const ovData = await ovRes.json();
+
+    await progressController.complete({
+      containerId: loaderContainerId,
+      barId: loaderBarId,
+      pctId: loaderPctId,
+      stageId: loaderStageId,
+      etaId: loaderEtaId,
+    });
+
     renderResultsState(ovData);
   } catch (err) {
+    progressController.stop(loaderContainerId);
     console.error('Failed to switch dataset:', err);
     alert(err.message || 'Failed to switch dataset.');
   }
@@ -220,38 +352,8 @@ async function runDemoBatch(datasetKey = 'elliptic') {
   try {
     const isElliptic = (datasetKey === 'elliptic' || state.demoBatchSize === 'elliptic');
     const isIbm = (datasetKey === 'ibm' || state.demoBatchSize === 'ibm');
-
-    if (isElliptic || isIbm) {
-      const ds = isElliptic ? 'elliptic' : 'ibm';
-      await switchBenchmarkDataset(ds);
-    } else {
-      // Subgraph or custom sample
-      const sampleRes = await fetch('/api/analysis/sample?dataset=elliptic&count=300');
-      if (!sampleRes.ok) throw new Error('Could not fetch sample transactions.');
-      const sampleData = await sampleRes.json();
-
-      const runRes = await fetch('/api/analysis/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: 'Elliptic++ Laundering Subgraph (8,145 Flows)',
-          csv_content: sampleData.csv_content,
-        }),
-      });
-
-      if (!runRes.ok) {
-        const err = await runRes.json().catch(() => ({}));
-        throw new Error(err.detail || 'Demo analysis failed.');
-      }
-
-      const runData = await runRes.json();
-      state.currentSessionId = runData.session_id;
-      state.sessionThreshold = runData.threshold || 0.399988;
-
-      const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(runData.session_id)}`);
-      const ovData = await ovRes.json();
-      renderResultsState(ovData);
-    }
+    const ds = isElliptic ? 'elliptic' : 'ibm';
+    await switchBenchmarkDataset(ds);
   } catch (err) {
     alert(err.message || 'Failed to load dataset.');
   } finally {
@@ -259,7 +361,6 @@ async function runDemoBatch(datasetKey = 'elliptic') {
       demoBtn.disabled = false;
       let label = 'Explore Elliptic++ Bitcoin Network';
       if (state.demoBatchSize === 'ibm') label = 'Explore IBM AML Benchmark';
-      else if (state.demoBatchSize === 'subgraph') label = 'Explore Elliptic++ Laundering Subgraph';
       if (runDemoText) runDemoText.textContent = label;
     }
   }
@@ -275,13 +376,32 @@ async function handleFileUpload(file) {
     return;
   }
 
-  const dropText = document.querySelector('.dropzone-text');
-  const origText = dropText ? dropText.textContent : 'Drop a CSV file here';
-  if (dropText) dropText.textContent = `Reading ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`;
+  const dropIdle = document.getElementById('dropzone-idle-content');
+  const dropProg = document.getElementById('dropzone-progress-content');
+  if (dropIdle) dropIdle.style.display = 'none';
+  if (dropProg) dropProg.style.display = 'flex';
+
+  const estDurationMs = Math.min(10000, Math.max(1600, (file.size / (1024 * 1024)) * 320));
+
+  progressController.start({
+    containerId: 'dropzone-progress-content',
+    barId: 'upload-progress-bar',
+    pctId: 'loading-percent-label',
+    stageId: 'loading-stage-label',
+    etaId: 'loading-eta-label',
+    filename: file.name,
+    estimatedMs: estDurationMs,
+    stages: [
+      { atPct: 10, text: `Reading ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)...` },
+      { atPct: 30, text: 'Auto-mapping schema & building temporal edges...' },
+      { atPct: 55, text: 'Analyzing and scoring with TGAT model (CUDA)...' },
+      { atPct: 80, text: 'Computing dynamic attention weights & risk tiers...' },
+      { atPct: 95, text: 'Finalizing network topology & AI briefing...' },
+    ]
+  });
 
   const reader = new FileReader();
   reader.onload = async (e) => {
-    if (dropText) dropText.textContent = 'Analyzing and scoring with TGAT model...';
     const csvContent = e.target.result;
     try {
       const runRes = await fetch('/api/analysis/run', {
@@ -295,6 +415,8 @@ async function handleFileUpload(file) {
 
       if (!runRes.ok) {
         const err = await runRes.json().catch(() => ({}));
+        progressController.stop('dropzone-progress-content');
+        if (dropIdle) dropIdle.style.display = 'flex';
         showFileProblem(err.detail || 'Your file could not be analyzed. Check that sender, receiver, amount and time columns are included.');
         return;
       }
@@ -305,12 +427,22 @@ async function handleFileUpload(file) {
 
       const ovRes = await fetch(`/api/analysis/overview?session_id=${encodeURIComponent(runData.session_id)}`);
       const ovData = await ovRes.json();
+
+      await progressController.complete({
+        containerId: 'dropzone-progress-content',
+        barId: 'upload-progress-bar',
+        pctId: 'loading-percent-label',
+        stageId: 'loading-stage-label',
+        etaId: 'loading-eta-label',
+      });
+
+      if (dropIdle) dropIdle.style.display = 'flex';
       renderResultsState(ovData);
 
     } catch (err) {
+      progressController.stop('dropzone-progress-content');
+      if (dropIdle) dropIdle.style.display = 'flex';
       showFileProblem(err.message || 'Error uploading file.');
-    } finally {
-      if (dropText) dropText.textContent = origText;
     }
   };
   reader.readAsText(file);

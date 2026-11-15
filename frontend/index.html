@@ -58,6 +58,24 @@
           <p class="page-subtitle">A fraud ring is a group of accounts that pass money around to hide where it came from. Add your data or try the demo, and see which accounts look suspicious and why.</p>
         </div>
 
+        <!-- Real-Time Dataset Loading & Model Scoring Progress Banner -->
+        <div id="global-dataset-loader" style="display: none; margin-top: 20px; padding: 18px 22px; border-radius: 12px; background: #FFFFFF; border: 1px solid #D0D7E3; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div class="progress-stage-text">
+              <span class="progress-stage-indicator"></span>
+              <span id="global-loader-stage" style="font-size: 15px; font-weight: 600;">Analyzing and scoring with TGAT model...</span>
+            </div>
+            <span id="global-loader-pct" style="font-size: 15px; font-weight: 700; color: var(--accent); font-family: var(--font-mono);">0%</span>
+          </div>
+          <div class="upload-progress-track" style="height: 10px;">
+            <div class="upload-progress-fill" id="global-loader-bar" style="width: 0%;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 13px; color: var(--text-secondary);">
+            <span id="global-loader-dataset-name">⚡ Dataset: Elliptic++ Bitcoin Network (203k tx)</span>
+            <span id="global-loader-eta" style="font-weight: 500;">Est. ~1.5s remaining</span>
+          </div>
+        </div>
+
         <div class="action-cards-grid">
           <!-- Upload Card -->
           <section class="action-card">
@@ -70,9 +88,35 @@
               <h2 class="action-card-title">Upload your file</h2>
             </div>
             <div class="dropzone-box" id="dropzone-box">
-              <span class="dropzone-text">Drop a CSV file here</span>
-              <span style="font-size: 14px; color: var(--text-muted);">or</span>
-              <button type="button" class="btn btn-secondary" id="btn-choose-file">Choose file</button>
+              <div id="dropzone-idle-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%;">
+                <span class="dropzone-text">Drop a CSV file here</span>
+                <span style="font-size: 14px; color: var(--text-muted);">or</span>
+                <button type="button" class="btn btn-secondary" id="btn-choose-file">Choose file</button>
+              </div>
+
+              <!-- Real-time Loading & Progress Bar -->
+              <div id="dropzone-progress-content" class="upload-progress-container" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <div class="progress-stage-text">
+                    <span class="progress-stage-indicator"></span>
+                    <span id="loading-stage-label">Analyzing and scoring with TGAT model...</span>
+                  </div>
+                  <span id="loading-percent-label" style="font-size: 14px; font-weight: 700; color: var(--accent); font-family: var(--font-mono);">0%</span>
+                </div>
+                
+                <div class="upload-progress-track">
+                  <div class="upload-progress-fill" id="upload-progress-bar" style="width: 0%;"></div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; gap: 6px;">
+                  <span id="loading-file-info" style="display: flex; align-items: center; gap: 6px;">
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <span id="loading-filename-text">dataset.csv</span>
+                  </span>
+                  <span id="loading-eta-label" style="font-weight: 500; color: #4B5563;">Est. ~1.5s remaining</span>
+                </div>
+              </div>
+
               <input type="file" id="file-input-csv" accept=".csv" style="display: none;">
             </div>
             <p style="margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.5;">CSV files up to 500MB supported. Auto-maps sender, receiver, amount, and time.</p>
@@ -150,6 +194,20 @@
             <button type="button" class="btn btn-secondary active" id="btn-switch-elliptic" title="Full Elliptic++ Bitcoin Network (203,769 transactions, 4,545 illicit addresses across 49 timesteps)">⚡ Elliptic++ (203k)</button>
             <button type="button" class="btn btn-secondary" id="btn-switch-ibm" title="Full IBM AML Multi-Bank Benchmark (282,877 transactions, 301 verified laundering rings)">🏦 IBM AML (282k)</button>
             <button type="button" class="btn btn-secondary" id="btn-upload-new">Upload custom CSV</button>
+          </div>
+        </div>
+
+        <!-- State B Dataset Switcher Progress Bar -->
+        <div id="state-b-dataset-loader" style="display: none; margin-top: 16px; margin-bottom: 4px; padding: 14px 18px; border-radius: 10px; background: #FFFFFF; border: 1px solid #D0D7E3; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div class="progress-stage-text">
+              <span class="progress-stage-indicator"></span>
+              <span id="state-b-loader-stage" style="font-size: 14px; font-weight: 600;">Switching dataset and loading graph topology...</span>
+            </div>
+            <span id="state-b-loader-pct" style="font-size: 14px; font-weight: 700; color: var(--accent); font-family: var(--font-mono);">0%</span>
+          </div>
+          <div class="upload-progress-track" style="height: 8px;">
+            <div class="upload-progress-fill" id="state-b-loader-bar" style="width: 0%;"></div>
           </div>
         </div>
 
