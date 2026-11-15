@@ -830,7 +830,13 @@ function updateGraphFilterUI() {
   }
 
   const total = state.graphNodes.length;
-  const matching = state.graphNodes.filter((n) => (n.max_risk_score || 0) >= val).length;
+  const activeEdges = (state.graphEdges || []).filter((e) => (e.max_risk_score || 0) >= val);
+  const connectedIds = new Set();
+  for (let i = 0; i < activeEdges.length; i++) {
+    connectedIds.add(activeEdges[i].source);
+    connectedIds.add(activeEdges[i].target);
+  }
+  const matching = state.graphNodes.filter((n) => connectedIds.has(n.id)).length;
   const networkTotal = state.totalNetworkNodes || total;
 
   const slider = document.getElementById('graph-risk-slider');
@@ -839,16 +845,16 @@ function updateGraphFilterUI() {
   if (badge) {
     if (val === 0) {
       if (networkTotal > total) {
-        badge.textContent = `Showing all ${total} priority accounts (Blue Normal, Yellow Watch, Red Alert · of ${networkTotal.toLocaleString()} in network)`;
+        badge.textContent = `Showing all ${total} connected accounts (Blue Normal, Yellow Watch, Red Alert · of ${networkTotal.toLocaleString()} in network)`;
       } else {
-        badge.textContent = total > 0 ? `Showing all ${total} accounts (Blue, Yellow, Red)` : 'Showing all accounts';
+        badge.textContent = total > 0 ? `Showing all ${total} connected accounts (Blue, Yellow, Red)` : 'Showing all connected accounts';
       }
     } else if (Math.abs(val - 0.20) < 0.02) {
-      badge.textContent = `Watch Tier: Showing ${matching} of ${total} accounts (Yellow & Red ≥ 0.20)`;
+      badge.textContent = `Watch Tier: Showing ${matching} of ${total} connected accounts (Yellow & Red ≥ 0.20)`;
     } else if (Math.abs(val - (state.sessionThreshold || 0.40)) < 0.02) {
-      badge.textContent = `Alert Tier: Showing ${matching} of ${total} accounts (Red only ≥ ${(state.sessionThreshold || 0.40).toFixed(2)})`;
+      badge.textContent = `Alert Tier: Showing ${matching} of ${total} connected accounts (Red only ≥ ${(state.sessionThreshold || 0.40).toFixed(2)})`;
     } else {
-      badge.textContent = `Showing ${matching} of ${total} accounts (risk ≥ ${val.toFixed(2)})`;
+      badge.textContent = `Showing ${matching} of ${total} connected accounts (risk ≥ ${val.toFixed(2)})`;
     }
   }
 
@@ -1053,11 +1059,15 @@ function runBoundedForceSimulation() {
     const cx = width / 2;
     const cy = height / 2;
 
-    // Node Repulsion & Collision Avoidance (applied among active nodes)
+    // Node Repulsion & Collision Avoidance (applied only among connected visible nodes)
     const minFilter = state.minRiskFilter || 0;
-    let activeNodes = state.graphNodes.filter(
-      (n) => (n.max_risk_score || 0) >= minFilter || (state.selectedNode && state.selectedNode.id === n.id)
-    );
+    const activeEdges = (state.graphEdges || []).filter((e) => (e.max_risk_score || 0) >= minFilter);
+    const connectedIds = new Set();
+    for (let i = 0; i < activeEdges.length; i++) {
+      connectedIds.add(activeEdges[i].source);
+      connectedIds.add(activeEdges[i].target);
+    }
+    let activeNodes = state.graphNodes.filter((n) => connectedIds.has(n.id));
     if (activeNodes.length > 250) {
       activeNodes = activeNodes.slice(0, 250);
     }
@@ -1150,13 +1160,25 @@ function drawCanvasGraph() {
   const minFilter = state.minRiskFilter || 0;
   const nodeMap = new Map(state.graphNodes.map((n) => [n.id, n]));
 
-  // Identify visible nodes strictly based on the risk slider
+  // 1. Identify active edges meeting the risk filter
+  const activeEdges = (state.graphEdges || []).filter((e) => (e.max_risk_score || 0) >= minFilter);
+
+  // 2. Identify accounts connected to each other by active edges
+  const connectedNodeIds = new Set();
+  for (let i = 0; i < activeEdges.length; i++) {
+    connectedNodeIds.add(activeEdges[i].source);
+    connectedNodeIds.add(activeEdges[i].target);
+  }
+
+  // 3. Visible nodes: ONLY accounts that are connected to each other (no isolated floating dots)
   const visibleNodeIds = new Set();
   state.graphNodes.forEach((n) => {
-    if ((n.max_risk_score || 0) >= minFilter) {
+    if (connectedNodeIds.has(n.id)) {
       visibleNodeIds.add(n.id);
     }
   });
+
+  state.visibleNodeIds = visibleNodeIds;
 
   // If currently selected node was filtered out by slider, auto-select top visible node
   if (state.selectedNode && !visibleNodeIds.has(state.selectedNode.id)) {
@@ -1170,17 +1192,17 @@ function drawCanvasGraph() {
     }
   }
 
-  // If no nodes match filter, show friendly guidance
+  // If no connected nodes match filter, show friendly guidance
   if (visibleNodeIds.size === 0) {
     ctx.save();
     ctx.font = '600 15px Inter, sans-serif';
     ctx.fillStyle = '#4A5B72';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`No accounts found with risk score ≥ ${minFilter.toFixed(2)} in this batch`, width / 2, height / 2 - 12);
+    ctx.fillText(`No connected accounts found with transaction risk score ≥ ${minFilter.toFixed(2)}`, width / 2, height / 2 - 12);
     ctx.font = '13px Inter, sans-serif';
     ctx.fillStyle = '#8A97AB';
-    ctx.fillText('Lower the risk slider above to view more accounts.', width / 2, height / 2 + 14);
+    ctx.fillText('Lower the risk slider above to view connected accounts.', width / 2, height / 2 + 14);
     ctx.restore();
     return;
   }
@@ -1371,8 +1393,7 @@ function getMousePos(e) {
 
 function isNodeVisible(node) {
   if (!node) return false;
-  const minFilter = state.minRiskFilter || 0;
-  return (node.max_risk_score || 0) >= minFilter;
+  return state.visibleNodeIds ? state.visibleNodeIds.has(node.id) : false;
 }
 
 function handleMouseDown(e) {

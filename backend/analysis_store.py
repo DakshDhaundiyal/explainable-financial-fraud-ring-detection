@@ -548,6 +548,13 @@ class AnalysisStore:
             edges = [e for e in edges if e["source"] in priority_ids and e["target"] in priority_ids]
             nodes = priority_nodes
 
+        # Enforce strict topology: only return accounts that are connected to each other by at least one edge
+        connected_ids = set()
+        for e in edges:
+            connected_ids.add(e["source"])
+            connected_ids.add(e["target"])
+        nodes = [n for n in nodes if n["id"] in connected_ids]
+
         return {
             "nodes": nodes,
             "edges": edges,
