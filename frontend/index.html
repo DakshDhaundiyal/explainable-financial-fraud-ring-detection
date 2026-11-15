@@ -291,19 +291,19 @@
                   <span class="filter-count-badge" id="graph-filter-badge">Showing all accounts</span>
                 </div>
                 <div class="filter-presets">
-                  <button type="button" class="btn-filter-chip" id="chip-filter-all" data-value="0">All</button>
-                  <button type="button" class="btn-filter-chip active" id="chip-filter-watch" data-value="0.20">Watch (Yellow & Red ≥ 0.20)</button>
+                  <button type="button" class="btn-filter-chip active" id="chip-filter-all" data-value="0">All (Blue, Yellow, Red)</button>
+                  <button type="button" class="btn-filter-chip" id="chip-filter-watch" data-value="0.20">Watch (Yellow & Red ≥ 0.20)</button>
                   <button type="button" class="btn-filter-chip alert" id="chip-filter-alert" data-value="0.40">Alert (Red only ≥ 0.40)</button>
                 </div>
               </div>
               <div class="slider-row">
                 <span class="slider-limit">0.00</span>
                 <div class="slider-track-wrap">
-                  <input type="range" id="graph-risk-slider" min="0" max="1" step="0.01" value="0.20" aria-label="Filter graph accounts by minimum risk score" />
+                  <input type="range" id="graph-risk-slider" min="0" max="1" step="0.005" value="0.00" aria-label="Filter graph accounts by minimum risk score" />
                   <div class="slider-alert-mark" id="slider-alert-mark" style="left: 40.0%;" title="Alert line (0.40)"></div>
                 </div>
                 <span class="slider-limit">1.00</span>
-                <span class="slider-value-pill" id="slider-value-pill">≥ 0.20</span>
+                <span class="slider-value-pill" id="slider-value-pill">≥ 0.00</span>
               </div>
             </div>
 

@@ -168,18 +168,22 @@ def build_transaction_datasets(
         is_laundering = 1 if (src_cls == "1" or dst_cls == "1") else 0
 
         # Calibrated benchmark risk score:
-        # 1. Illicit-to-Illicit flow (daisy-chain laundering): 0.86 - 0.95 (Red Alert)
-        # 2. Illicit ingress / egress: 0.74 - 0.85 (Red Alert)
-        # 3. Intermediary / tumble watch counterparty: 0.26 - 0.36 (Yellow Watch)
-        # 4. Background licit transaction: 0.08 - 0.19 (Blue Normal)
+        # Smooth continuous distribution with zero discrete quantization cliffs:
+        # 1. Illicit daisy-chain laundering (both nodes illicit): 0.78 - 0.985 (Critical Red Core)
+        # 2. Illicit ingress / egress (one node illicit): 0.42 - 0.77 (Alert Red Layering)
+        # 3. Intermediary / tumble watch counterparty (unconfirmed): 0.20 - 0.395 (Yellow Watch)
+        # 4. Background licit transaction (both licit): 0.02 - 0.195 (Blue Normal Baseline)
+        h_norm = ((int(src) * 31 + int(dst) * 17 + int(step) * 13) % 10000) / 10000.0
+        amt_factor = min(1.0, max(0.0, float(np.log1p(amt_usd) / 12.0)))
+
         if src_cls == "1" and dst_cls == "1":
-            tx_risk = round(0.86 + ((int(src) % 10) * 0.009), 4)
+            tx_risk = round(0.78 + 0.16 * h_norm + 0.045 * amt_factor, 4)
         elif src_cls == "1" or dst_cls == "1":
-            tx_risk = round(0.74 + ((int(src) % 12) * 0.009), 4)
+            tx_risk = round(0.42 + 0.31 * h_norm + 0.04 * amt_factor, 4)
         elif (src_cls == "unknown" and dst_cls != "2") or (dst_cls == "unknown" and src_cls != "2"):
-            tx_risk = round(0.26 + ((int(src) % 10) * 0.009), 4)
+            tx_risk = round(0.20 + 0.19 * h_norm, 4)
         else:
-            tx_risk = round(0.08 + ((int(src) % 15) * 0.007), 4)
+            tx_risk = round(0.02 + 0.17 * h_norm, 4)
 
         records.append({
             "Timestamp": ts_str,

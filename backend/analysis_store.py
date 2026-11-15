@@ -463,18 +463,86 @@ class AnalysisStore:
                 active_node_ids.add(e["target"])
             nodes = [n for n in nodes if n["id"] in active_node_ids]
 
-        # For large networks (e.g. 10k or 200k nodes), prioritize high-risk fraud rings
-        # and interconnected hubs so the browser canvas renders instantly at 60 FPS.
+        # For large networks (e.g. 10k or 200k nodes), create a rich, stratified multi-tier sample
+        # (High Risk Alert, Medium Risk Watch, Low Risk Normal) prioritizing connected hubs and neighbor
+        # counterparties, ensuring smooth continuous filtering across the entire 0.00 - 1.00 slider.
         if len(nodes) > max_nodes:
-            priority_nodes = sorted(
-                nodes,
-                key=lambda n: (
-                    1 if n.get("risk_level") == "High Risk" else (0.5 if n.get("risk_level") == "Medium Risk" else 0),
-                    n.get("max_risk_score", 0.0),
-                    n.get("in_degree", 0) + n.get("out_degree", 0)
-                ),
-                reverse=True
-            )[:max_nodes]
+            thresh = session.threshold or 0.40
+
+            if min_score is not None and min_score > 0:
+                priority_nodes = sorted(
+                    nodes,
+                    key=lambda n: (
+                        n.get("max_risk_score", 0.0),
+                        n.get("in_degree", 0) + n.get("out_degree", 0)
+                    ),
+                    reverse=True
+                )[:max_nodes]
+            else:
+                high_risk = [n for n in nodes if n.get("max_risk_score", 0.0) >= thresh]
+                med_risk = [n for n in nodes if 0.20 <= n.get("max_risk_score", 0.0) < thresh]
+                low_risk = [n for n in nodes if n.get("max_risk_score", 0.0) < 0.20]
+
+                target_high = min(len(high_risk), int(max_nodes * 0.42))  # ~190
+                target_med = min(len(med_risk), int(max_nodes * 0.33))    # ~150
+                target_low = min(len(low_risk), max_nodes - target_high - target_med)  # ~110
+
+                # Spread high risk across scores and prioritize high-degree hubs
+                high_sorted = sorted(
+                    high_risk,
+                    key=lambda n: (
+                        n.get("in_degree", 0) + n.get("out_degree", 0),
+                        n.get("max_risk_score", 0.0)
+                    ),
+                    reverse=True
+                )[:target_high]
+                selected_ids = {n["id"] for n in high_sorted}
+
+                connected_neighbor_ids = set()
+                for e in edges:
+                    if e["source"] in selected_ids:
+                        connected_neighbor_ids.add(e["target"])
+                    if e["target"] in selected_ids:
+                        connected_neighbor_ids.add(e["source"])
+
+                med_sorted = sorted(
+                    med_risk,
+                    key=lambda n: (
+                        1 if n["id"] in connected_neighbor_ids else 0,
+                        n.get("in_degree", 0) + n.get("out_degree", 0),
+                        n.get("max_risk_score", 0.0)
+                    ),
+                    reverse=True
+                )[:target_med]
+                for n in med_sorted:
+                    selected_ids.add(n["id"])
+
+                for e in edges:
+                    if e["source"] in selected_ids:
+                        connected_neighbor_ids.add(e["target"])
+                    if e["target"] in selected_ids:
+                        connected_neighbor_ids.add(e["source"])
+
+                low_sorted = sorted(
+                    low_risk,
+                    key=lambda n: (
+                        1 if n["id"] in connected_neighbor_ids else 0,
+                        n.get("in_degree", 0) + n.get("out_degree", 0),
+                        n.get("max_risk_score", 0.0)
+                    ),
+                    reverse=True
+                )[:target_low]
+
+                priority_nodes = high_sorted + med_sorted + low_sorted
+                if len(priority_nodes) < max_nodes:
+                    chosen_ids = {n["id"] for n in priority_nodes}
+                    remaining = [n for n in nodes if n["id"] not in chosen_ids]
+                    remaining_sorted = sorted(
+                        remaining,
+                        key=lambda n: (n.get("max_risk_score", 0.0), n.get("in_degree", 0) + n.get("out_degree", 0)),
+                        reverse=True
+                    )
+                    priority_nodes.extend(remaining_sorted[:max_nodes - len(priority_nodes)])
 
             priority_ids = {n["id"] for n in priority_nodes}
             edges = [e for e in edges if e["source"] in priority_ids and e["target"] in priority_ids]

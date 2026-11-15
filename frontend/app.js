@@ -14,7 +14,7 @@ const state = {
   selectedAccountId: null,
   activeSubtab: 'why',
   isPaused: false,
-  minRiskFilter: 0.20, // Fast-load: default to Yellow & Red accounts (risk >= 0.20) to prevent browser UI lag
+  minRiskFilter: 0.0, // Default to showing all accounts (Blue Normal, Yellow Watch, Red Alert) across entire spectrum
   demoBatchSize: 'elliptic', // Default to Elliptic++ Bitcoin dataset
   isGraphFocused: false, // Large focus mode on graph rectangle
   
@@ -660,11 +660,7 @@ function renderResultsState(data) {
   const isLargeOrElliptic = (data.distinct_accounts && data.distinct_accounts >= 60) || 
                             (data.total_transactions && data.total_transactions >= 80) ||
                             (data.filename && data.filename.toLowerCase().includes('elliptic'));
-  if (isLargeOrElliptic) {
-    state.minRiskFilter = 0.20;
-  } else {
-    state.minRiskFilter = 0;
-  }
+  state.minRiskFilter = 0;
 
   // Load Graph & Auto-Select Highest-Risk Account
   loadGraphTopology();
@@ -847,24 +843,24 @@ function updateGraphFilterUI() {
   if (slider) slider.value = val;
 
   if (badge) {
-    if (networkTotal > total) {
-      if (val === 0) {
-        badge.textContent = `Showing top ${total} priority accounts (of ${networkTotal.toLocaleString()} in uploaded network)`;
+    if (val === 0) {
+      if (networkTotal > total) {
+        badge.textContent = `Showing all ${total} priority accounts (Blue Normal, Yellow Watch, Red Alert · of ${networkTotal.toLocaleString()} in network)`;
       } else {
-        badge.textContent = `Showing top ${matching} priority accounts (of ${networkTotal.toLocaleString()} in uploaded network · risk ≥ ${val.toFixed(2)})`;
+        badge.textContent = total > 0 ? `Showing all ${total} accounts (Blue, Yellow, Red)` : 'Showing all accounts';
       }
-    } else if (val === 0) {
-      badge.textContent = total > 0 ? `Showing all ${total} accounts (Blue, Yellow, Red)` : 'Showing all accounts';
-    } else if (Math.abs(val - 0.20) < 0.03) {
-      badge.textContent = `⚡ Fast-Load Active: Showing ${matching} of ${total} accounts (Yellow & Red only · click 'All' to show blue dots)`;
+    } else if (Math.abs(val - 0.20) < 0.02) {
+      badge.textContent = `Watch Tier: Showing ${matching} of ${total} accounts (Yellow & Red ≥ 0.20)`;
+    } else if (Math.abs(val - (state.sessionThreshold || 0.40)) < 0.02) {
+      badge.textContent = `Alert Tier: Showing ${matching} of ${total} accounts (Red only ≥ ${(state.sessionThreshold || 0.40).toFixed(2)})`;
     } else {
       badge.textContent = `Showing ${matching} of ${total} accounts (risk ≥ ${val.toFixed(2)})`;
     }
   }
 
   if (chipAll) chipAll.classList.toggle('active', val === 0);
-  if (chipWatch) chipWatch.classList.toggle('active', Math.abs(val - 0.20) < 0.03);
-  if (chipAlert) chipAlert.classList.toggle('active', Math.abs(val - (state.sessionThreshold || 0.399988)) < 0.03);
+  if (chipWatch) chipWatch.classList.toggle('active', Math.abs(val - 0.20) < 0.02);
+  if (chipAlert) chipAlert.classList.toggle('active', Math.abs(val - (state.sessionThreshold || 0.399988)) < 0.02);
 }
 
 async function loadGraphTopology() {
@@ -1160,15 +1156,25 @@ function drawCanvasGraph() {
   const minFilter = state.minRiskFilter || 0;
   const nodeMap = new Map(state.graphNodes.map((n) => [n.id, n]));
 
-  // Identify visible nodes based on risk filter or selection
+  // Identify visible nodes strictly based on the risk slider
   const visibleNodeIds = new Set();
   state.graphNodes.forEach((n) => {
-    const isSelected = state.selectedNode && state.selectedNode.id === n.id;
-    const meetsFilter = (n.max_risk_score || 0) >= minFilter;
-    if (meetsFilter || isSelected) {
+    if ((n.max_risk_score || 0) >= minFilter) {
       visibleNodeIds.add(n.id);
     }
   });
+
+  // If currently selected node was filtered out by slider, auto-select top visible node
+  if (state.selectedNode && !visibleNodeIds.has(state.selectedNode.id)) {
+    const nextBest = state.graphNodes
+      .filter((n) => visibleNodeIds.has(n.id))
+      .sort((a, b) => (b.max_risk_score || 0) - (a.max_risk_score || 0))[0];
+    if (nextBest) {
+      selectAccountNode(nextBest);
+    } else {
+      state.selectedNode = null;
+    }
+  }
 
   // If no nodes match filter, show friendly guidance
   if (visibleNodeIds.size === 0) {
@@ -1311,8 +1317,15 @@ function drawCanvasGraph() {
     const isWatch = !isRisk && (n.max_risk_score || 0) >= 0.20;
 
     let fillColor = '#3B6FE0'; // Normal
-    if (isRisk) fillColor = '#D92D20';
-    else if (isWatch) fillColor = '#F2A33A';
+    if (isRisk) {
+      if ((n.max_risk_score || 0) >= 0.85) {
+        fillColor = '#B42318'; // Deep crimson for severe ring core
+      } else {
+        fillColor = '#E0523B'; // Vibrant coral red for high risk
+      }
+    } else if (isWatch) {
+      fillColor = '#F2A33A'; // Amber/yellow for watch tier
+    }
 
     // Pulsing Outer Ring on Selected Node
     if (isSelected) {
@@ -1365,8 +1378,7 @@ function getMousePos(e) {
 function isNodeVisible(node) {
   if (!node) return false;
   const minFilter = state.minRiskFilter || 0;
-  const isSelected = state.selectedNode && state.selectedNode.id === node.id;
-  return (node.max_risk_score || 0) >= minFilter || isSelected;
+  return (node.max_risk_score || 0) >= minFilter;
 }
 
 function handleMouseDown(e) {
