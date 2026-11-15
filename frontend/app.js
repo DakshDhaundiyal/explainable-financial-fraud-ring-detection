@@ -1506,12 +1506,6 @@ async function selectAccountNode(node) {
   state.selectedNode = node;
   state.selectedAccountId = node.id;
 
-  // Sync dropdown selector
-  const rankSelect = document.getElementById('account-rank-select');
-  if (rankSelect && rankSelect.value !== node.id) {
-    rankSelect.value = node.id;
-  }
-
   // Update active state in side ranked list
   document.querySelectorAll('.side-ranked-item').forEach((el) => {
     el.classList.toggle('active', el.dataset.id === node.id);
@@ -1943,50 +1937,8 @@ async function loadRankedAccounts() {
     });
   }
 
-  renderRankedAccountsDropdown();
   renderSideRankedList();
   renderRankedAccountsTable();
-}
-
-function renderRankedAccountsDropdown() {
-  const selectEl = document.getElementById('account-rank-select');
-  const counterEl = document.getElementById('account-rank-counter');
-  if (!selectEl) return;
-
-  const accounts = state.rankedAccounts || [];
-  if (counterEl) {
-    counterEl.textContent = `${accounts.length} accounts`;
-  }
-
-  selectEl.innerHTML = '';
-  if (accounts.length === 0) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'No accounts available';
-    selectEl.appendChild(opt);
-    return;
-  }
-
-  accounts.forEach((acc, idx) => {
-    const opt = document.createElement('option');
-    opt.value = acc.id;
-    const scoreStr = (acc.max_risk_score || 0).toFixed(2);
-    const icon = acc.risk_level_code === 'high' ? '🔴' : (acc.risk_level_code === 'medium' ? '🟡' : '🔵');
-    opt.textContent = `#${idx + 1} · ${acc.id} (Risk: ${scoreStr}) ${icon} ${acc.risk_level}`;
-    selectEl.appendChild(opt);
-  });
-
-  if (state.selectedNode) {
-    selectEl.value = state.selectedNode.id;
-  }
-
-  selectEl.onchange = (e) => {
-    const selectedId = e.target.value;
-    if (!selectedId) return;
-    const targetNode = (state.graphNodes || []).find((n) => n.id === selectedId) || { id: selectedId, max_risk_score: 0 };
-    selectAccountNode(targetNode);
-    switchSubtab('why');
-  };
 }
 
 function renderSideRankedList() {
@@ -2158,20 +2110,6 @@ function initRankedAccountsEvents() {
       });
     }
   });
-
-  const nextBtn = document.getElementById('btn-next-account');
-  if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
-      const accounts = state.rankedAccounts || [];
-      if (accounts.length === 0) return;
-      const currentIdx = accounts.findIndex((a) => a.id === state.selectedAccountId);
-      const nextIdx = (currentIdx + 1) % accounts.length;
-      const nextAcc = accounts[nextIdx];
-      const targetNode = (state.graphNodes || []).find((n) => n.id === nextAcc.id) || { id: nextAcc.id, max_risk_score: nextAcc.max_risk_score };
-      selectAccountNode(targetNode);
-      switchSubtab('why');
-    });
-  }
 }
 
 window.handleAccountSelectById = function(accId) {

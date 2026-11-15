@@ -1322,15 +1322,6 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   }
 }
 
-/* FAST ACCOUNT SELECTOR WIDGET */
-.account-selector-box {
-  transition: all 0.2s ease;
-}
-.account-selector-box:focus-within {
-  border-color: #4F46E5 !important;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
-}
-
 /* SIDE PANEL RANKED LIST ITEM */
 .side-ranked-item {
   display: flex;
