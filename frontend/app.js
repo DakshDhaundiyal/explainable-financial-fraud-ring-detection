@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGraphCanvas();
   initGraphSlider();
   initSubtabs();
+  initRankedAccountsEvents();
 
   // Start on State A by default so evaluator sees the front page first
   state.detectState = 'A';
@@ -1023,6 +1024,9 @@ async function loadGraphTopology() {
       selectAccountNode(highestRiskNode);
     }
 
+    // Load and populate ranked accounts in descending order of risk
+    loadRankedAccounts();
+
   } catch (err) {
     console.warn('Failed to load topology graph:', err);
   }
@@ -1463,11 +1467,13 @@ function handleWheel(e) {
 
 function initSubtabs() {
   const whyBtn = document.getElementById('subtab-why');
+  const rankedBtn = document.getElementById('subtab-ranked');
   const txsBtn = document.getElementById('subtab-txs');
   const connBtn = document.getElementById('subtab-connections');
   const seeTxsBtn = document.getElementById('btn-see-account-txs');
 
   if (whyBtn) whyBtn.addEventListener('click', () => switchSubtab('why'));
+  if (rankedBtn) rankedBtn.addEventListener('click', () => switchSubtab('ranked'));
   if (txsBtn) txsBtn.addEventListener('click', () => switchSubtab('txs'));
   if (connBtn) connBtn.addEventListener('click', () => switchSubtab('connections'));
 
@@ -1486,10 +1492,12 @@ function switchSubtab(tabName) {
   });
 
   const pWhy = document.getElementById('panel-why');
+  const pRanked = document.getElementById('panel-ranked');
   const pTxs = document.getElementById('panel-txs');
   const pConn = document.getElementById('panel-connections');
 
   if (pWhy) pWhy.style.display = tabName === 'why' ? 'block' : 'none';
+  if (pRanked) pRanked.style.display = tabName === 'ranked' ? 'block' : 'none';
   if (pTxs) pTxs.style.display = tabName === 'txs' ? 'block' : 'none';
   if (pConn) pConn.style.display = tabName === 'connections' ? 'block' : 'none';
 }
@@ -1497,6 +1505,29 @@ function switchSubtab(tabName) {
 async function selectAccountNode(node) {
   state.selectedNode = node;
   state.selectedAccountId = node.id;
+
+  // Sync dropdown selector
+  const rankSelect = document.getElementById('account-rank-select');
+  if (rankSelect && rankSelect.value !== node.id) {
+    rankSelect.value = node.id;
+  }
+
+  // Update active state in side ranked list
+  document.querySelectorAll('.side-ranked-item').forEach((el) => {
+    el.classList.toggle('active', el.dataset.id === node.id);
+  });
+
+  // Update active state in ranked accounts table
+  document.querySelectorAll('.ranked-account-row').forEach((el) => {
+    el.classList.toggle('selected', el.dataset.id === node.id);
+  });
+
+  // Center node in canvas view if coordinates exist
+  if (canvas && node.x !== undefined && node.y !== undefined) {
+    const scale = Math.max(state.transform.scale, 0.9);
+    state.transform.x = canvas.width / 2 - node.x * scale;
+    state.transform.y = canvas.height / 2 - node.y * scale;
+  }
 
   // Update canvas aria-label
   if (canvas) {
@@ -1548,7 +1579,7 @@ async function selectAccountNode(node) {
 function renderAccountDetails(acc, score, isRisk, isWatch) {
   const thresh = state.sessionThreshold;
 
-  // 1. Why Callout (Maximum 2 short sentences per explanation. Plain English.)
+  // 1. Why Callout (Simple, plain English without jargon)
   const calloutBox = document.getElementById('why-callout-box');
   const cTitle = document.getElementById('why-callout-title');
   const cDesc = document.getElementById('why-callout-desc');
@@ -1558,19 +1589,19 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
   if (isRingMember) {
     calloutBox.className = 'why-callout risk';
     if (acc.account_id === '8091C4A00') {
-      cTitle.textContent = '🚨 Coordinated Fraud Ring: Central Hub';
-      cDesc.textContent = '16 separate accounts quickly transferred over $2.5 million into this single account within 15 minutes, which was then immediately wired out.';
+      cTitle.textContent = '🚨 Central Collection Account';
+      cDesc.textContent = '16 separate accounts quickly transferred over $2.5 million into this single account within 15 minutes, which was then immediately sent out to an exit account.';
     } else if (acc.account_id === '809FB8870') {
-      cTitle.textContent = '🚨 Coordinated Fraud Ring: Exit Account';
-      cDesc.textContent = 'Received $2,379,528.90 in two rapid transfers directly from the hub account to extract the pooled cash.';
+      cTitle.textContent = '🚨 Cash-Out Exit Account';
+      cDesc.textContent = 'Received $2,379,528.90 in two rapid transfers directly from the collection account to withdraw the pooled funds.';
     } else {
-      cTitle.textContent = '🚨 Coordinated Fraud Ring: Circular Mule';
-      cDesc.textContent = 'Sends money in a continuous circle with other accounts to make dirty money look like normal trade, then funnels the cash into the central hub.';
+      cTitle.textContent = '🚨 Moving Money in Circles';
+      cDesc.textContent = 'Sends money in circles with other linked accounts to make suspicious activity look like regular business, then funnels the cash into the central account.';
     }
   } else if (isRisk) {
     calloutBox.className = 'why-callout risk';
-    cTitle.textContent = 'Likely part of a fraud ring';
-    cDesc.textContent = 'This account passes money rapidly in circular loops or pass-through chains. Immediate review recommended.';
+    cTitle.textContent = 'Suspicious Account Activity';
+    cDesc.textContent = 'This account passes money rapidly in circles or quick pass-through chains. Immediate review recommended.';
   } else if (isWatch) {
     calloutBox.className = 'why-callout watch';
     cTitle.textContent = 'Worth keeping an eye on';
@@ -1581,7 +1612,7 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
     cDesc.textContent = 'This account moves money in a typical pattern. No action is needed.';
   }
 
-  // 1b. AI Investigation Narrative & Network Analysis
+  // 1b. AI Simple Investigation Narrative
   const aiNarrativeText = document.getElementById('ai-narrative-text');
   const aiModelBadge = document.getElementById('ai-model-badge');
   const aiAskInput = document.getElementById('ai-ask-input');
@@ -1589,7 +1620,7 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
   const aiAskAnswer = document.getElementById('ai-ask-answer');
 
   if (aiNarrativeText) {
-    aiNarrativeText.textContent = acc.ai_narrative || 'Network analysis generated.';
+    aiNarrativeText.textContent = acc.ai_narrative || 'Simple explanation generated.';
   }
   if (aiModelBadge) {
     aiModelBadge.textContent = acc.ai_model_used || 'Gemini 3.8 Flash';
@@ -1606,7 +1637,7 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
       if (aiAskBtn) aiAskBtn.disabled = true;
       if (aiAskAnswer) {
         aiAskAnswer.style.display = 'block';
-        aiAskAnswer.textContent = 'Analyzing network context...';
+        aiAskAnswer.textContent = 'Analyzing in plain English...';
       }
       try {
         const askRes = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/account/${encodeURIComponent(acc.account_id)}/ask`, {
@@ -1714,25 +1745,25 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
 }
 
 function buildPlainEnglishDrivers(acc, score, threshold, isRisk, isWatch) {
-  // If account is part of the coordinated 8091 fraud ring, provide precise plain English reasons
+  // If account is part of the coordinated 8091 fraud ring, provide simple plain English reasons
   if (acc.account_id && (acc.account_id.startsWith('8091') || acc.account_id === '809FB8870')) {
     if (acc.account_id === '8091C4A00') {
       return [
         {
-          title: '16-account smurfing funnel',
-          explanation: 'Received 16 structured transfers from separate mule accounts in 15 minutes to dodge reporting limits.',
+          title: '16 accounts sent money quickly',
+          explanation: 'Received 16 transfers from different accounts in 15 minutes to avoid normal transfer limits.',
           impactLabel: 'High',
           impactClass: 'high',
         },
         {
-          title: 'Immediate cash-out exit',
-          explanation: 'Transferred $2.37M to an off-ramp exit account right after receiving the funds, emptying the balance.',
+          title: 'Immediate cash-out transfer',
+          explanation: 'Sent $2.37M out to an exit account right after receiving the funds, emptying the balance.',
           impactLabel: 'High',
           impactClass: 'high',
         },
         {
-          title: 'Exceeds alert threshold',
-          explanation: `${score.toFixed(2)} is well above the decision alert line of ${threshold.toFixed(2)}.`,
+          title: 'Above alert line',
+          explanation: `${score.toFixed(2)} is well above the risk alert line of ${threshold.toFixed(2)}.`,
           impactLabel: 'High',
           impactClass: 'high',
         },
@@ -1740,20 +1771,20 @@ function buildPlainEnglishDrivers(acc, score, threshold, isRisk, isWatch) {
     } else if (acc.account_id === '809FB8870') {
       return [
         {
-          title: 'High-value off-ramp transfer',
-          explanation: 'Received $2,379,528.90 in two quick wire transfers from the central laundering hub.',
+          title: 'Large transfer from main account',
+          explanation: 'Received $2,379,528.90 in two quick transfers from the central group account.',
           impactLabel: 'High',
           impactClass: 'high',
         },
         {
-          title: 'Zero regular customer history',
-          explanation: 'Only activated to receive bulk extracted funds from the laundering network.',
+          title: 'No normal account history',
+          explanation: 'This account was only used to receive money from the suspicious group.',
           impactLabel: 'High',
           impactClass: 'high',
         },
         {
-          title: 'Exceeds alert threshold',
-          explanation: `${score.toFixed(2)} is well above the decision alert line of ${threshold.toFixed(2)}.`,
+          title: 'Above alert line',
+          explanation: `${score.toFixed(2)} is well above the risk alert line of ${threshold.toFixed(2)}.`,
           impactLabel: 'High',
           impactClass: 'high',
         },
@@ -1761,20 +1792,20 @@ function buildPlainEnglishDrivers(acc, score, threshold, isRisk, isWatch) {
     } else {
       return [
         {
-          title: 'Circular round-tripping loop',
-          explanation: 'Transfers money in a continuous circle with other ring members to fake real commercial sales.',
+          title: 'Money moving in circles',
+          explanation: 'Transfers money in a circle with other accounts to look like regular business.',
           impactLabel: 'High',
           impactClass: 'high',
         },
         {
-          title: 'Structured hub deposit',
-          explanation: 'Funnels large structured amounts into the central collector account within minutes.',
+          title: 'Funnels money to main account',
+          explanation: 'Quickly funnels collected funds into the main central account.',
           impactLabel: 'High',
           impactClass: 'high',
         },
         {
-          title: 'Exceeds alert threshold',
-          explanation: `${score.toFixed(2)} is well above the decision alert line of ${threshold.toFixed(2)}.`,
+          title: 'Above alert line',
+          explanation: `${score.toFixed(2)} is well above the risk alert line of ${threshold.toFixed(2)}.`,
           impactLabel: 'High',
           impactClass: 'high',
         },
@@ -1785,7 +1816,7 @@ function buildPlainEnglishDrivers(acc, score, threshold, isRisk, isWatch) {
   const drivers = [];
   const rawFactors = acc.risk_factors || [];
 
-  // Parse existing drivers or behavioral markers
+  // Parse existing drivers or behavioral markers into simple, friendly language
   rawFactors.forEach((f) => {
     const titleLower = f.title.toLowerCase();
     const descLower = f.description.toLowerCase();
@@ -1793,22 +1824,22 @@ function buildPlainEnglishDrivers(acc, score, threshold, isRisk, isWatch) {
     if (titleLower.includes('velocity') || descLower.includes('rapid') || descLower.includes('pass-through')) {
       drivers.push({
         title: 'Rapid pass-through',
-        explanation: 'Money moved in and out of this account within minutes, which is common in laundering chains.',
+        explanation: 'Money moved in and out of this account within minutes, which is common when hiding funds.',
         impactLabel: 'High',
         impactClass: 'high',
         priority: 1,
       });
     } else if (titleLower.includes('counterparty') || descLower.includes('flagged') || descLower.includes('known')) {
       drivers.push({
-        title: 'Linked to a flagged account',
-        explanation: 'This account transacted directly with another account that triggered an alert.',
+        title: 'Linked to high-risk account',
+        explanation: 'This account transacted directly with another account that was flagged as high risk.',
         impactLabel: 'High',
         impactClass: 'high',
         priority: 2,
       });
     } else if (titleLower.includes('cycle') || descLower.includes('loop') || descLower.includes('circular')) {
       drivers.push({
-        title: 'Money going round in a loop',
+        title: 'Money moving in circles',
         explanation: 'Funds travel across multiple accounts and eventually circle back to the start.',
         impactLabel: 'High',
         impactClass: 'high',
@@ -1817,23 +1848,23 @@ function buildPlainEnglishDrivers(acc, score, threshold, isRisk, isWatch) {
     } else if (titleLower.includes('cross-bank') || descLower.includes('bank')) {
       drivers.push({
         title: 'Repeated cross-bank transfers',
-        explanation: 'Frequent movement across different financial institutions to complicate tracking.',
+        explanation: 'Frequent movement across different banks to make tracking difficult.',
         impactLabel: 'Medium',
         impactClass: 'medium',
         priority: 4,
       });
     } else if (titleLower.includes('burst') || descLower.includes('burst')) {
       drivers.push({
-        title: 'Burst of activity',
-        explanation: 'A sudden cluster of transactions in a short time window.',
+        title: 'Sudden burst of activity',
+        explanation: 'A sudden rush of transfers clustered into a very short window of time.',
         impactLabel: 'Medium',
         impactClass: 'medium',
         priority: 5,
       });
     } else if (titleLower.includes('amount') || descLower.includes('amount') || descLower.includes('large')) {
       drivers.push({
-        title: "High amount for this account",
-        explanation: 'The transfer volume is significantly higher than this account normally sees.',
+        title: 'High amount for this account',
+        explanation: 'The transfer amount is significantly larger than what this account usually handles.',
         impactLabel: 'Medium',
         impactClass: 'medium',
         priority: 6,
@@ -1873,6 +1904,274 @@ function buildPlainEnglishDrivers(acc, score, threshold, isRisk, isWatch) {
 
   // Sort by priority and return
   return drivers.sort((a, b) => a.priority - b.priority);
+}
+
+// ============================================================================
+// 6. RANKED ACCOUNTS IN DESCENDING ORDER OF RISK
+// ============================================================================
+
+async function loadRankedAccounts() {
+  if (!state.currentSessionId) return;
+
+  try {
+    const res = await fetch(`/api/analysis/${encodeURIComponent(state.currentSessionId)}/accounts?limit=1000`);
+    if (!res.ok) throw new Error('Accounts fetch failed');
+    const data = await res.json();
+    state.rankedAccounts = data.accounts || [];
+  } catch (err) {
+    console.warn('Failed to fetch ranked accounts, building from graph nodes:', err);
+    // Fallback: build from state.graphNodes
+    const nodes = (state.graphNodes || []).slice();
+    nodes.sort((a, b) => (b.max_risk_score || 0) - (a.max_risk_score || 0));
+    state.rankedAccounts = nodes.map((n, idx) => {
+      const score = n.max_risk_score || 0;
+      const isHigh = score >= (state.sessionThreshold || 0.40);
+      const isMed = score >= 0.20 && !isHigh;
+      return {
+        id: n.id,
+        label: n.label || n.id,
+        max_risk_score: score,
+        risk_level: isHigh ? 'High Risk' : (isMed ? 'Needs Watching' : 'Normal'),
+        risk_level_code: isHigh ? 'high' : (isMed ? 'medium' : 'low'),
+        is_flagged: isHigh,
+        total_sent: n.total_sent || 0,
+        total_received: n.total_received || 0,
+        total_volume: (n.total_sent || 0) + (n.total_received || 0),
+        connections: (n.in_degree || 0) + (n.out_degree || 0) || 1,
+        rank: idx + 1,
+      };
+    });
+  }
+
+  renderRankedAccountsDropdown();
+  renderSideRankedList();
+  renderRankedAccountsTable();
+}
+
+function renderRankedAccountsDropdown() {
+  const selectEl = document.getElementById('account-rank-select');
+  const counterEl = document.getElementById('account-rank-counter');
+  if (!selectEl) return;
+
+  const accounts = state.rankedAccounts || [];
+  if (counterEl) {
+    counterEl.textContent = `${accounts.length} accounts`;
+  }
+
+  selectEl.innerHTML = '';
+  if (accounts.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No accounts available';
+    selectEl.appendChild(opt);
+    return;
+  }
+
+  accounts.forEach((acc, idx) => {
+    const opt = document.createElement('option');
+    opt.value = acc.id;
+    const scoreStr = (acc.max_risk_score || 0).toFixed(2);
+    const icon = acc.risk_level_code === 'high' ? '🔴' : (acc.risk_level_code === 'medium' ? '🟡' : '🔵');
+    opt.textContent = `#${idx + 1} · ${acc.id} (Risk: ${scoreStr}) ${icon} ${acc.risk_level}`;
+    selectEl.appendChild(opt);
+  });
+
+  if (state.selectedNode) {
+    selectEl.value = state.selectedNode.id;
+  }
+
+  selectEl.onchange = (e) => {
+    const selectedId = e.target.value;
+    if (!selectedId) return;
+    const targetNode = (state.graphNodes || []).find((n) => n.id === selectedId) || { id: selectedId, max_risk_score: 0 };
+    selectAccountNode(targetNode);
+    switchSubtab('why');
+  };
+}
+
+function renderSideRankedList() {
+  const container = document.getElementById('side-ranked-accounts-list');
+  const countBadge = document.getElementById('side-ranked-count');
+  if (!container) return;
+
+  const accounts = state.rankedAccounts || [];
+  if (countBadge) {
+    countBadge.textContent = `${accounts.length} ranked`;
+  }
+
+  if (accounts.length === 0) {
+    container.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 13px;">No accounts found.</div>';
+    return;
+  }
+
+  container.innerHTML = accounts.map((acc, idx) => {
+    const isSelected = state.selectedAccountId === acc.id;
+    const scoreStr = (acc.max_risk_score || 0).toFixed(2);
+    const colorClass = acc.risk_level_code === 'high' ? 'risk' : (acc.risk_level_code === 'medium' ? 'watch' : 'normal');
+    const dotColor = acc.risk_level_code === 'high' ? '#DC2626' : (acc.risk_level_code === 'medium' ? '#D97706' : '#2563EB');
+
+    return `
+      <div class="side-ranked-item ${isSelected ? 'active' : ''}" data-id="${acc.id}">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="rank-badge">#${idx + 1}</span>
+          <div>
+            <div class="mono" style="font-size: 13.5px; font-weight: 600; color: var(--text-primary);">${acc.id}</div>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 1px;">
+              ${acc.connections || 1} links · $${(acc.total_volume || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="status-pill ${colorClass}" style="font-size: 11px; padding: 2px 7px;">${acc.risk_level}</span>
+          <span class="mono" style="font-size: 13px; font-weight: 700; color: ${dotColor};">${scoreStr}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.side-ranked-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const accId = item.dataset.id;
+      const targetNode = (state.graphNodes || []).find((n) => n.id === accId) || { id: accId, max_risk_score: 0 };
+      selectAccountNode(targetNode);
+      switchSubtab('why');
+    });
+  });
+}
+
+function renderRankedAccountsTable() {
+  const tbody = document.getElementById('ranked-accounts-tbody');
+  const countBadge = document.getElementById('table-account-count-badge');
+  if (!tbody) return;
+
+  let accounts = state.rankedAccounts || [];
+
+  // Filter state
+  const searchInput = document.getElementById('ranked-accounts-search');
+  const searchTerm = (searchInput ? searchInput.value : '').trim().toLowerCase();
+  const activeFilter = state.rankedTableFilter || 'all';
+
+  if (searchTerm) {
+    accounts = accounts.filter((a) => a.id.toLowerCase().includes(searchTerm));
+  }
+
+  if (activeFilter === 'risk') {
+    accounts = accounts.filter((a) => a.risk_level_code === 'high');
+  } else if (activeFilter === 'watch') {
+    accounts = accounts.filter((a) => a.risk_level_code === 'medium');
+  } else if (activeFilter === 'normal') {
+    accounts = accounts.filter((a) => a.risk_level_code === 'low');
+  }
+
+  if (countBadge) {
+    countBadge.textContent = `${accounts.length} of ${(state.rankedAccounts || []).length} accounts`;
+  }
+
+  if (accounts.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px;">
+          No matching accounts found.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = accounts.map((acc) => {
+    const isSelected = state.selectedAccountId === acc.id;
+    const score = acc.max_risk_score || 0;
+    const scorePct = Math.min(100, Math.max(0, score * 100));
+    const tierCode = acc.risk_level_code || 'low';
+    const tierLabel = acc.risk_level || 'Normal';
+    const barColor = tierCode === 'high' ? '#DC2626' : (tierCode === 'medium' ? '#D97706' : '#2563EB');
+
+    return `
+      <tr class="ranked-account-row ${isSelected ? 'selected' : ''}" data-id="${acc.id}">
+        <td style="font-weight: 700; color: var(--text-muted); font-size: 12.5px;">#${acc.rank}</td>
+        <td>
+          <span class="mono" style="font-weight: 600; font-size: 14px; color: var(--text-primary);">${acc.id}</span>
+        </td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="flex: 1; height: 7px; background: #E2E8F0; border-radius: 999px; overflow: hidden; max-width: 130px;">
+              <div style="width: ${scorePct}%; height: 100%; background: ${barColor}; border-radius: 999px;"></div>
+            </div>
+            <span class="mono" style="font-weight: 700; font-size: 13px; color: ${barColor};">${score.toFixed(2)}</span>
+          </div>
+        </td>
+        <td>
+          <span class="tier-badge ${tierCode}">
+            <span style="font-size: 10px;">${tierCode === 'high' ? '●' : (tierCode === 'medium' ? '▲' : '■')}</span>
+            ${tierLabel}
+          </span>
+        </td>
+        <td style="color: var(--text-secondary); font-size: 13px;">
+          ${acc.connections || 1} links
+        </td>
+        <td class="mono" style="font-size: 13px; color: var(--text-primary);">
+          $${(acc.total_volume || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+        </td>
+        <td style="text-align: right;">
+          <button type="button" class="btn-explain-action" data-id="${acc.id}">
+            <span>Explain</span>
+            <span style="font-size: 13px;">✨</span>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Row and button click handlers
+  tbody.querySelectorAll('.ranked-account-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      const accId = row.dataset.id;
+      const targetNode = (state.graphNodes || []).find((n) => n.id === accId) || { id: accId, max_risk_score: 0 };
+      selectAccountNode(targetNode);
+      switchSubtab('why');
+      document.querySelector('.account-column')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+function initRankedAccountsEvents() {
+  const searchInput = document.getElementById('ranked-accounts-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => renderRankedAccountsTable());
+  }
+
+  const chips = [
+    { id: 'btn-rank-filter-all', filter: 'all' },
+    { id: 'btn-rank-filter-risk', filter: 'risk' },
+    { id: 'btn-rank-filter-watch', filter: 'watch' },
+    { id: 'btn-rank-filter-normal', filter: 'normal' },
+  ];
+
+  chips.forEach(({ id, filter }) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', () => {
+        state.rankedTableFilter = filter;
+        chips.forEach((c) => document.getElementById(c.id)?.classList.remove('active'));
+        btn.classList.add('active');
+        renderRankedAccountsTable();
+      });
+    }
+  });
+
+  const nextBtn = document.getElementById('btn-next-account');
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      const accounts = state.rankedAccounts || [];
+      if (accounts.length === 0) return;
+      const currentIdx = accounts.findIndex((a) => a.id === state.selectedAccountId);
+      const nextIdx = (currentIdx + 1) % accounts.length;
+      const nextAcc = accounts[nextIdx];
+      const targetNode = (state.graphNodes || []).find((n) => n.id === nextAcc.id) || { id: nextAcc.id, max_risk_score: nextAcc.max_risk_score };
+      selectAccountNode(targetNode);
+      switchSubtab('why');
+    });
+  }
 }
 
 window.handleAccountSelectById = function(accId) {

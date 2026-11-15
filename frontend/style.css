@@ -1321,3 +1321,114 @@ button:focus-visible, a:focus-visible, input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* FAST ACCOUNT SELECTOR WIDGET */
+.account-selector-box {
+  transition: all 0.2s ease;
+}
+.account-selector-box:focus-within {
+  border-color: #4F46E5 !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* SIDE PANEL RANKED LIST ITEM */
+.side-ranked-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-card);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.side-ranked-item:hover {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  transform: translateX(2px);
+}
+.side-ranked-item.active {
+  background: #EEF2FF;
+  border-color: #6366F1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+}
+.side-ranked-item .rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #F1F5F9;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+}
+.side-ranked-item.active .rank-badge {
+  background: #4F46E5;
+  color: #FFFFFF;
+}
+
+/* RANKED ACCOUNTS FULL TABLE CARD */
+.ranked-accounts-card {
+  transition: all 0.25s ease;
+}
+.ranked-accounts-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+.ranked-account-row {
+  border-bottom: 1px solid var(--border-card);
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.ranked-account-row:hover {
+  background: #F8FAFC;
+}
+.ranked-account-row.selected {
+  background: #EEF2FF;
+}
+.ranked-account-row td {
+  padding: 12px 14px;
+  vertical-align: middle;
+}
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.tier-badge.high {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+.tier-badge.medium {
+  background: #FEF3C7;
+  color: #92400E;
+}
+.tier-badge.low {
+  background: #E0E7FF;
+  color: #3730A3;
+}
+.btn-explain-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: #4F46E5;
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-explain-action:hover {
+  background: #4338CA;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}

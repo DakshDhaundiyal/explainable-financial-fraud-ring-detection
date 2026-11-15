@@ -812,6 +812,97 @@ class AnalysisStore:
             "transactions": sorted_txs,
         }
 
+    def get_accounts(
+        self,
+        session_id: Optional[str] = None,
+        sort_by: str = "risk_score",
+        sort_dir: str = "desc",
+        limit: int = 500,
+        search: Optional[str] = None,
+        risk_level: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return interconnected accounts ordered by risk score descending with optional filtering."""
+        session = self.get_session(session_id)
+        if not session:
+            return {"accounts": [], "total": 0, "threshold": 0.40}
+
+        nodes = session.graph.get("nodes", [])
+        thresh = session.threshold or 0.40
+
+        # Only include accounts that are interconnected with at least one transaction
+        accounts = []
+        for n in nodes:
+            in_deg = int(n.get("in_degree", 0))
+            out_deg = int(n.get("out_degree", 0))
+            if in_deg + out_deg == 0:
+                continue
+
+            score = float(n.get("max_risk_score", 0.0))
+            is_high = score >= thresh
+            is_med = 0.20 <= score < thresh
+            lvl_code = "high" if is_high else ("medium" if is_med else "low")
+            lvl_label = "High Risk" if is_high else ("Needs Watching" if is_med else "Normal")
+
+            sent = float(n.get("total_sent", 0.0))
+            recv = float(n.get("total_received", 0.0))
+
+            accounts.append({
+                "id": str(n.get("id", "")),
+                "label": str(n.get("label", n.get("id", ""))),
+                "max_risk_score": round(score, 4),
+                "risk_level": lvl_label,
+                "risk_level_code": lvl_code,
+                "is_flagged": is_high,
+                "total_sent": round(sent, 2),
+                "total_received": round(recv, 2),
+                "total_volume": round(sent + recv, 2),
+                "in_degree": in_deg,
+                "out_degree": out_deg,
+                "connections": in_deg + out_deg,
+            })
+
+        # Filter by search
+        if search:
+            q = search.strip().lower()
+            accounts = [a for a in accounts if q in a["id"].lower()]
+
+        # Filter by risk_level
+        if risk_level:
+            rl = risk_level.strip().lower()
+            if rl in ("high", "risk", "alert"):
+                accounts = [a for a in accounts if a["risk_level_code"] == "high"]
+            elif rl in ("medium", "watch"):
+                accounts = [a for a in accounts if a["risk_level_code"] == "medium"]
+            elif rl in ("low", "normal", "safe"):
+                accounts = [a for a in accounts if a["risk_level_code"] == "low"]
+
+        # Sort
+        reverse = (sort_dir.lower() == "desc")
+        if sort_by == "risk_score":
+            accounts.sort(key=lambda a: (a["max_risk_score"], a["total_volume"]), reverse=reverse)
+        elif sort_by == "total_volume":
+            accounts.sort(key=lambda a: a["total_volume"], reverse=reverse)
+        elif sort_by == "connections":
+            accounts.sort(key=lambda a: a["connections"], reverse=reverse)
+        elif sort_by == "id":
+            accounts.sort(key=lambda a: a["id"], reverse=reverse)
+        else:
+            accounts.sort(key=lambda a: a["max_risk_score"], reverse=True)
+
+        total_matching = len(accounts)
+        accounts_slice = accounts[:limit]
+
+        # Assign 1-based rank
+        for i, a in enumerate(accounts_slice, 1):
+            a["rank"] = i
+
+        return {
+            "accounts": accounts_slice,
+            "total": total_matching,
+            "threshold": thresh,
+            "session_id": session.session_id,
+        }
+
     def export_csv(self, session_id: Optional[str] = None) -> Optional[str]:
         session = self.get_session(session_id)
         if not session or not session.transactions:

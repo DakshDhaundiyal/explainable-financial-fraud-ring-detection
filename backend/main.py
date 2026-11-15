@@ -675,6 +675,26 @@ def get_account_detail(session_id: str, account_id: str):
     return acc
 
 
+@app.get("/api/analysis/{session_id}/accounts")
+def get_analysis_accounts(
+    session_id: str,
+    sort_by: str = Query("risk_score"),
+    sort_dir: str = Query("desc"),
+    limit: int = Query(500, ge=1, le=10000),
+    search: Optional[str] = Query(None),
+    risk_level: Optional[str] = Query(None),
+):
+    """Return interconnected accounts ordered by risk score descending with optional filtering."""
+    return analysis_store.get_accounts(
+        session_id=session_id,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        limit=limit,
+        search=search,
+        risk_level=risk_level,
+    )
+
+
 @app.post("/api/analysis/{session_id}/account/{account_id}/ask")
 def ask_account_question_endpoint(session_id: str, account_id: str, payload: AccountQuestionRequest):
     """Ask an interactive follow-up question about this account and its network topology."""
