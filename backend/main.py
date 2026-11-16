@@ -525,7 +525,7 @@ def get_sample_benchmark_data(
 
 
 @app.post("/api/analysis/switch-dataset")
-def switch_active_dataset(dataset: str = Query("elliptic")):
+def switch_active_dataset(dataset: str = Query("ibm")):
     """Switch active full benchmark dataset (elliptic or ibm)."""
     sess_id = "ANL-ELLIPTIC-FULL" if "elliptic" in dataset.lower() else "ANL-IBM-FULL"
     sess = analysis_store.get_session(sess_id)
@@ -554,7 +554,7 @@ def get_analysis_overview(session_id: Optional[str] = Query(None)):
     session = analysis_store.get_session(session_id)
     if not session:
         analysis_store.seed_benchmark_datasets()
-        session = analysis_store.get_session("ANL-ELLIPTIC-FULL")
+        session = analysis_store.get_session("ANL-IBM-FULL")
 
     if not session:
         return {

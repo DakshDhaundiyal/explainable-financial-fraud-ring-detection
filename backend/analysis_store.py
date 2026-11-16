@@ -300,6 +300,7 @@ class AnalysisStore:
             score_distribution=ibm_score_dist,
         )
         self._sessions["ANL-IBM-FULL"] = session_ibm
+        self._latest_id = "ANL-IBM-FULL"
 
     def add_session(
         self,

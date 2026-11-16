@@ -15,7 +15,7 @@ const state = {
   activeSubtab: 'why',
   isPaused: false,
   minRiskFilter: 0.0, // Default to showing all accounts (Blue Normal, Yellow Watch, Red Alert) across entire spectrum
-  demoBatchSize: 'elliptic', // Default to Elliptic++ Bitcoin dataset
+  demoBatchSize: 'ibm', // Default to IBM AML Benchmark dataset
   isGraphFocused: false, // Large focus mode on graph rectangle
   
   // Graph Canvas & Simulation
@@ -206,7 +206,7 @@ function initStartActions() {
   }
 
   if (demoBtn) {
-    demoBtn.addEventListener('click', () => runDemoBatch(state.demoBatchSize || 'elliptic'));
+    demoBtn.addEventListener('click', () => runDemoBatch(state.demoBatchSize || 'ibm'));
   }
 
   if (chooseFileBtn && fileInput) {
@@ -336,7 +336,7 @@ const progressController = {
   }
 };
 
-async function switchBenchmarkDataset(datasetName = 'elliptic') {
+async function switchBenchmarkDataset(datasetName = 'ibm') {
   const btnElliptic = document.getElementById('btn-switch-elliptic');
   const btnIbm = document.getElementById('btn-switch-ibm');
 
@@ -403,7 +403,7 @@ async function switchBenchmarkDataset(datasetName = 'elliptic') {
   }
 }
 
-async function runDemoBatch(datasetKey = 'elliptic') {
+async function runDemoBatch(datasetKey = 'ibm') {
   const demoBtn = document.getElementById('btn-run-demo');
   const runDemoText = document.getElementById('run-demo-text');
   if (demoBtn) {
@@ -412,17 +412,16 @@ async function runDemoBatch(datasetKey = 'elliptic') {
   }
 
   try {
-    const isElliptic = (datasetKey === 'elliptic' || state.demoBatchSize === 'elliptic');
     const isIbm = (datasetKey === 'ibm' || state.demoBatchSize === 'ibm');
-    const ds = isElliptic ? 'elliptic' : 'ibm';
+    const ds = isIbm ? 'ibm' : 'elliptic';
     await switchBenchmarkDataset(ds);
   } catch (err) {
     alert(err.message || 'Failed to load dataset.');
   } finally {
     if (demoBtn) {
       demoBtn.disabled = false;
-      let label = 'Explore Elliptic++ Bitcoin Network';
-      if (state.demoBatchSize === 'ibm') label = 'Explore IBM AML Benchmark';
+      let label = 'Explore IBM AML Benchmark';
+      if (state.demoBatchSize === 'elliptic') label = 'Explore Elliptic++ Bitcoin Network';
       if (runDemoText) runDemoText.textContent = label;
     }
   }
@@ -643,7 +642,7 @@ function renderResultsState(data) {
       txCount.textContent = `${total.toLocaleString()} transactions`;
     }
   }
-  if (sessId) sessId.textContent = data.session_id || 'ANL-ELLIPTIC-FULL';
+  if (sessId) sessId.textContent = data.session_id || 'ANL-IBM-FULL';
 
   // 2. Verdict Banner
   const banner = document.getElementById('verdict-banner');
