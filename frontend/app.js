@@ -75,6 +75,10 @@ function initThemeToggle() {
 
   let currentTheme = 'dark';
   try {
+    if (localStorage.getItem('theme_normal_reset') !== 'true') {
+      localStorage.setItem('theme', 'dark');
+      localStorage.setItem('theme_normal_reset', 'true');
+    }
     const saved = localStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark') {
       currentTheme = saved;
@@ -2041,16 +2045,16 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
 
   if (txLedger) {
     if (txs.length === 0) {
-      txLedger.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">No direct transactions recorded for this account.</div>`;
+      txLedger.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: var(--bg-card-subtle);">No direct transactions recorded for this account.</div>`;
     } else {
       txLedger.innerHTML = txs.map((t) => {
         const isSender = t.from_account === acc.account_id;
         const otherParty = isSender ? `To ${t.to_account}` : `From ${t.from_account}`;
         const tScore = Number(t.risk_score || 0);
         return `
-          <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); transition: all 0.15s ease;">
+          <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-subtle); transition: all 0.15s ease;">
             <div>
-              <div class="mono" style="font-weight: 600; font-size: 14px; color: #FFFFFF;">$${Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div class="mono" style="font-weight: 600; font-size: 14px; color: var(--text-primary);">$${Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div class="mono" style="font-size: 12px; color: var(--text-secondary); margin-top: 3px; display: flex; align-items: center; gap: 4px;">
                 <span>${isSender ? '↗' : '↙'}</span>
                 <span>${otherParty}</span>
@@ -2084,12 +2088,12 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
 
   if (connList) {
     if (conns.length === 0) {
-      connList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">No linked accounts found.</div>`;
+      connList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: var(--bg-card-subtle);">No linked accounts found.</div>`;
     } else {
       connList.innerHTML = conns.map((cp) => `
-        <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); transition: all 0.15s ease;">
+        <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-subtle); transition: all 0.15s ease;">
           <div>
-            <div class="mono" style="font-weight: 600; font-size: 13.5px; color: var(--accent-light);">${cp.account_id}</div>
+            <div class="mono" style="font-weight: 600; font-size: 13.5px; color: var(--accent);">${cp.account_id}</div>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
               ${cp.transaction_count} transfer(s) · $${Number(cp.total_amount).toLocaleString()}
             </div>

@@ -6,23 +6,27 @@
   <title>Fraud Ring Defender — Explainable TGAT Financial Fraud Detection</title>
   <meta name="description" content="Explainable Temporal Graph Attention Network (TGAT) for Financial Fraud Ring Detection on IBM AML Benchmark.">
   <meta name="application-name" content="FRAUD RING DEFENDER">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="dark">
   <script>
     (function() {
       try {
-        const saved = localStorage.getItem('theme');
-        if (saved === 'light' || saved === 'dark') {
-          document.documentElement.setAttribute('data-theme', saved);
-          const meta = document.querySelector('meta[name="color-scheme"]');
-          if (meta) meta.content = saved;
+        let theme = localStorage.getItem('theme');
+        if (localStorage.getItem('theme_normal_reset') !== 'true') {
+          theme = 'dark';
+          localStorage.setItem('theme', 'dark');
+          localStorage.setItem('theme_normal_reset', 'true');
         }
+        if (theme !== 'light') theme = 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+        const meta = document.querySelector('meta[name="color-scheme"]');
+        if (meta) meta.content = theme;
       } catch (e) {}
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4.2">
+  <link rel="stylesheet" href="style.css?v=4.3">
 </head>
 <body>
   <!-- TOP BAR NAVIGATION -->
@@ -338,11 +342,11 @@
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 18px;">✨</span>
-              <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #FFFFFF; letter-spacing: 0.02em;">AI Investigation Briefing (Full Batch)</h3>
+              <h3 class="ai-batch-briefing-title">AI Investigation Briefing (Full Batch)</h3>
             </div>
-            <span class="mono" id="ai-batch-model-badge" style="font-size: 11px; padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); color: #E0E7FF; font-weight: 600;">Gemini 3.8 Flash</span>
+            <span class="mono ai-batch-model-badge" id="ai-batch-model-badge">Gemini 3.8 Flash</span>
           </div>
-          <p id="ai-batch-briefing-text" style="margin: 0; font-size: 13.5px; line-height: 1.6; color: #E0E7FF;">Analyzing batch graph structure...</p>
+          <p class="ai-batch-briefing-text" id="ai-batch-briefing-text">Analyzing batch graph structure...</p>
         </div>
 
         <!-- 4. Two Columns: Graph (Left) & Selected Account (Right) -->
@@ -490,20 +494,20 @@
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                   <div style="display: flex; align-items: center; gap: 6px;">
                     <span style="font-size: 16px;">✨</span>
-                    <span style="font-size: 13px; font-weight: 700; color: #C4B5FD; letter-spacing: 0.02em;">Simple AI Explanation</span>
+                    <span class="ai-card-title">Simple AI Explanation</span>
                   </div>
-                  <span class="mono" id="ai-model-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(139, 92, 246, 0.2); color: #C4B5FD; font-weight: 600;">Gemini 3.8 Flash</span>
+                  <span class="mono ai-badge" id="ai-model-badge">Gemini 3.8 Flash</span>
                 </div>
-                <p id="ai-narrative-text" style="margin: 0; font-size: 13.5px; line-height: 1.6; color: #E0E7FF; white-space: pre-line;">Generating simple explanation...</p>
+                <p class="ai-narrative-text" id="ai-narrative-text">Generating simple explanation...</p>
 
                 <!-- Interactive Follow-up Question -->
-                <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(139, 92, 246, 0.25);">
-                  <div style="font-size: 11.5px; font-weight: 600; color: #A78BFA; margin-bottom: 6px;">Ask AI about this account in plain English:</div>
+                <div class="ai-ask-wrapper">
+                  <div class="ai-ask-label">Ask AI about this account in plain English:</div>
                   <div style="display: flex; gap: 6px;">
-                    <input type="text" id="ai-ask-input" placeholder="e.g. What did this account do with the money?" style="flex: 1; padding: 8px 12px; font-size: 12.5px; border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 8px; outline: none; background: rgba(0, 0, 0, 0.3); color: #FFFFFF;">
+                    <input type="text" id="ai-ask-input" class="ai-ask-input" placeholder="e.g. What did this account do with the money?">
                     <button type="button" id="ai-ask-btn" class="btn btn-primary" style="padding: 0 14px; font-size: 12px; height: 34px;">Ask</button>
                   </div>
-                  <div id="ai-ask-answer" style="display: none; margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(139, 92, 246, 0.3); font-size: 13px; line-height: 1.5; color: #E0E7FF; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>
+                  <div id="ai-ask-answer" class="ai-ask-answer" style="display: none;"></div>
                 </div>
               </div>
 
@@ -549,7 +553,7 @@
             <div id="panel-txs" style="display: none; margin-top: 18px;">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                 <div>
-                  <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;" id="panel-txs-title">Transactions Ledger</div>
+                  <div class="panel-section-title" id="panel-txs-title">Transactions Ledger</div>
                   <div style="font-size: 12px; color: var(--text-secondary);" id="panel-txs-subtitle">Inbound and outbound transfers for the selected account</div>
                 </div>
                 <span class="mono" id="panel-txs-count" style="font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(139, 92, 246, 0.2); color: #C4B5FD; font-weight: 600;">0 transfers</span>
@@ -566,7 +570,7 @@
             <div id="panel-connections" style="display: none; margin-top: 18px;">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                 <div>
-                  <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;" id="panel-connections-title">Connected Counterparties</div>
+                  <div class="panel-section-title" id="panel-connections-title">Connected Counterparties</div>
                   <div style="font-size: 12px; color: var(--text-secondary);" id="panel-connections-subtitle">Direct accounts sending or receiving money with this account</div>
                 </div>
                 <span class="mono" id="panel-connections-count" style="font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(139, 92, 246, 0.2); color: #C4B5FD; font-weight: 600;">0 linked</span>
@@ -596,7 +600,7 @@
               </p>
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-              <input type="text" id="ranked-accounts-search" placeholder="Search account ID..." style="padding: 8px 12px; font-size: 13px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; width: 220px; background: rgba(255, 255, 255, 0.04); color: #FFFFFF; outline: none;">
+              <input type="text" id="ranked-accounts-search" class="ranked-search-input" placeholder="Search account ID...">
               <div class="filter-presets">
                 <button type="button" class="btn-filter-chip active" id="btn-rank-filter-all">All</button>
                 <button type="button" class="btn-filter-chip alert" id="btn-rank-filter-risk">High Risk</button>
@@ -609,7 +613,7 @@
           <!-- Table -->
           <div class="table-scroll" style="max-height: 480px; overflow-y: auto;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px;" id="ranked-accounts-table">
-              <thead style="position: sticky; top: 0; background: #120E26; z-index: 2; border-bottom: 2px solid var(--border-card);">
+              <thead class="ranked-table-head">
                 <tr>
                   <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted); width: 60px;">Rank</th>
                   <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted);">Account ID</th>
@@ -694,6 +698,6 @@
 
   </main>
 
-  <script src="app.js?v=4.2"></script>
+  <script src="app.js?v=4.3"></script>
 </body>
 </html>
