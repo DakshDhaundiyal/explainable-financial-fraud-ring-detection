@@ -714,8 +714,19 @@ function initGraphCanvas() {
   window.addEventListener('resize', () => {
     if (state.detectState === 'B') {
       resizeGraphCanvas();
+      drawCanvasGraph();
     }
   });
+
+  if (window.ResizeObserver && canvas && canvas.parentElement) {
+    const ro = new ResizeObserver(() => {
+      if (state.detectState === 'B') {
+        resizeGraphCanvas();
+        drawCanvasGraph();
+      }
+    });
+    ro.observe(canvas.parentElement);
+  }
 
   // Interactive mouse events
   canvas.addEventListener('mousedown', handleMouseDown);
@@ -777,9 +788,13 @@ function toggleFlowAnimation() {
 
 function resizeGraphCanvas() {
   if (!canvas) return;
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width || (state.isGraphFocused ? 1120 : 720);
-  canvas.height = rect.height || (state.isGraphFocused ? 760 : 600);
+  const parent = canvas.parentElement;
+  if (!parent) return;
+  const rect = parent.getBoundingClientRect();
+  const w = Math.floor(rect.width);
+  const h = Math.floor(rect.height);
+  if (w > 0) canvas.width = w;
+  if (h > 0) canvas.height = h;
 }
 
 function initGraphSlider() {
@@ -1684,6 +1699,38 @@ function unselectAccountAndShowAll() {
     `;
   }
 
+  const txLedger = document.getElementById('account-tx-ledger');
+  if (txLedger) {
+    txLedger.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+        <div style="font-size: 16px; margin-bottom: 6px;">💳 No Account Selected</div>
+        <div style="font-size: 13px;">Click any account node on the graph or table to view its full transaction ledger.</div>
+      </div>
+    `;
+  }
+  const pTxTitle = document.getElementById('panel-txs-title');
+  const pTxCount = document.getElementById('panel-txs-count');
+  const bTxCount = document.getElementById('badge-txs-count');
+  if (pTxTitle) pTxTitle.textContent = 'Transactions Ledger';
+  if (pTxCount) pTxCount.textContent = '0 transfers';
+  if (bTxCount) bTxCount.style.display = 'none';
+
+  const connList = document.getElementById('account-connections-list');
+  if (connList) {
+    connList.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+        <div style="font-size: 16px; margin-bottom: 6px;">🔗 No Account Selected</div>
+        <div style="font-size: 13px;">Click any account node on the graph or table to inspect its linked counterparties and transfer flows.</div>
+      </div>
+    `;
+  }
+  const pConnTitle = document.getElementById('panel-connections-title');
+  const pConnCount = document.getElementById('panel-connections-count');
+  const bConnCount = document.getElementById('badge-conn-count');
+  if (pConnTitle) pConnTitle.textContent = 'Connected Counterparties';
+  if (pConnCount) pConnCount.textContent = '0 linked';
+  if (bConnCount) bConnCount.style.display = 'none';
+
   document.querySelectorAll('.side-ranked-item').forEach((el) => el.classList.remove('active'));
   document.querySelectorAll('.ranked-account-row').forEach((el) => el.classList.remove('selected'));
 
@@ -1875,26 +1922,40 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
 
   // 4. Populate Transactions Subtab
   const txLedger = document.getElementById('account-tx-ledger');
+  const panelTxsTitle = document.getElementById('panel-txs-title');
+  const panelTxsCount = document.getElementById('panel-txs-count');
+  const badgeTxsCount = document.getElementById('badge-txs-count');
+  const txs = acc.transactions || [];
+
+  if (panelTxsTitle) panelTxsTitle.textContent = `Transactions for ${acc.account_id}`;
+  if (panelTxsCount) panelTxsCount.textContent = `${txs.length} transfer${txs.length === 1 ? '' : 's'}`;
+  if (badgeTxsCount) {
+    badgeTxsCount.textContent = txs.length;
+    badgeTxsCount.style.display = txs.length > 0 ? 'inline-block' : 'none';
+  }
+
   if (txLedger) {
-    const txs = acc.transactions || [];
     if (txs.length === 0) {
-      txLedger.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No transactions recorded.</div>`;
+      txLedger.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">No direct transactions recorded for this account.</div>`;
     } else {
       txLedger.innerHTML = txs.map((t) => {
         const isSender = t.from_account === acc.account_id;
         const otherParty = isSender ? `To ${t.to_account}` : `From ${t.from_account}`;
         const tScore = Number(t.risk_score || 0);
         return `
-          <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03);">
+          <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); transition: all 0.15s ease;">
             <div>
-              <div class="mono" style="font-weight: 600; font-size: 14px;">$${Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div class="mono" style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">${otherParty}</div>
+              <div class="mono" style="font-weight: 600; font-size: 14px; color: #FFFFFF;">$${Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div class="mono" style="font-size: 12px; color: var(--text-secondary); margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+                <span>${isSender ? '↗' : '↙'}</span>
+                <span>${otherParty}</span>
+              </div>
             </div>
             <div style="text-align: right;">
-              <span class="mono" style="font-size: 13px; font-weight: 600; color: ${tScore >= thresh ? 'var(--status-risk-text)' : 'var(--text-secondary)'};">
+              <span class="mono" style="font-size: 13px; font-weight: 700; color: ${tScore >= thresh ? 'var(--status-risk-text)' : 'var(--text-secondary)'};">
                 ${tScore.toFixed(2)}
               </span>
-              <div style="font-size: 11px; color: var(--text-muted);">${formatTime(t.timestamp)}</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${formatTime(t.timestamp)}</div>
             </div>
           </div>
         `;
@@ -1904,20 +1965,31 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
 
   // 5. Populate Connections Subtab
   const connList = document.getElementById('account-connections-list');
+  const panelConnTitle = document.getElementById('panel-connections-title');
+  const panelConnCount = document.getElementById('panel-connections-count');
+  const badgeConnCount = document.getElementById('badge-conn-count');
+  const conns = acc.counterparties_details || [];
+
+  if (panelConnTitle) panelConnTitle.textContent = `Counterparties for ${acc.account_id}`;
+  if (panelConnCount) panelConnCount.textContent = `${conns.length} linked account${conns.length === 1 ? '' : 's'}`;
+  if (badgeConnCount) {
+    badgeConnCount.textContent = conns.length;
+    badgeConnCount.style.display = conns.length > 0 ? 'inline-block' : 'none';
+  }
+
   if (connList) {
-    const conns = acc.counterparties_details || [];
     if (conns.length === 0) {
-      connList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No linked accounts.</div>`;
+      connList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">No linked accounts found.</div>`;
     } else {
       connList.innerHTML = conns.map((cp) => `
-        <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03);">
+        <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03); transition: all 0.15s ease;">
           <div>
-            <div class="mono" style="font-weight: 600; font-size: 14px; color: var(--accent);">${cp.account_id}</div>
+            <div class="mono" style="font-weight: 600; font-size: 13.5px; color: var(--accent-light);">${cp.account_id}</div>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
               ${cp.transaction_count} transfer(s) · $${Number(cp.total_amount).toLocaleString()}
             </div>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="handleAccountSelectById('${cp.account_id}')" style="min-height: 36px; padding: 0 12px; font-size: 13px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="handleAccountSelectById('${cp.account_id}')" style="min-height: 34px; padding: 0 12px; font-size: 12px;" title="Inspect this counterparty account">
             Inspect
           </button>
         </div>
@@ -2523,6 +2595,22 @@ async function loadComparisonMetrics() {
 
 function formatTime(ts) {
   if (!ts) return '—';
-  const d = new Date(ts * 1000);
-  return d.toISOString().replace('T', ' ').substring(0, 16);
+  if (typeof ts === 'string') {
+    if (ts.includes('-') || ts.includes('/') || ts.includes('T')) {
+      const d = new Date(ts);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().replace('T', ' ').substring(0, 16);
+      }
+      return ts.substring(0, 16);
+    }
+  }
+  const num = Number(ts);
+  if (!isNaN(num)) {
+    const ms = num > 1e11 ? num : num * 1000;
+    const d = new Date(ms);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().replace('T', ' ').substring(0, 16);
+    }
+  }
+  return String(ts).substring(0, 16);
 }

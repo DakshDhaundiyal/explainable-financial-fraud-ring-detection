@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4.0">
+  <link rel="stylesheet" href="style.css?v=4.1">
 </head>
 <body>
   <!-- TOP BAR NAVIGATION -->
@@ -406,8 +406,8 @@
             <div class="sidepanel-tabs" role="tablist" aria-label="Account details">
               <button type="button" class="subtab-btn active" id="subtab-why" role="tab" aria-selected="true">Explanation</button>
               <button type="button" class="subtab-btn" id="subtab-ranked" role="tab" aria-selected="false">Ranked Accounts</button>
-              <button type="button" class="subtab-btn" id="subtab-txs" role="tab" aria-selected="false">Transactions</button>
-              <button type="button" class="subtab-btn" id="subtab-connections" role="tab" aria-selected="false">Connections</button>
+              <button type="button" class="subtab-btn" id="subtab-txs" role="tab" aria-selected="false">Transactions <span class="subtab-count" id="badge-txs-count" style="display: none;">0</span></button>
+              <button type="button" class="subtab-btn" id="subtab-connections" role="tab" aria-selected="false">Connections <span class="subtab-count" id="badge-conn-count" style="display: none;">0</span></button>
             </div>
 
             <!-- Tab Panel: Why -->
@@ -479,15 +479,35 @@
 
             <!-- Tab Panel: Transactions -->
             <div id="panel-txs" style="display: none; margin-top: 18px;">
-              <div style="display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto;" id="account-tx-ledger">
-                <!-- Rows populated dynamically -->
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div>
+                  <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;" id="panel-txs-title">Transactions Ledger</div>
+                  <div style="font-size: 12px; color: var(--text-secondary);" id="panel-txs-subtitle">Inbound and outbound transfers for the selected account</div>
+                </div>
+                <span class="mono" id="panel-txs-count" style="font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(139, 92, 246, 0.2); color: #C4B5FD; font-weight: 600;">0 transfers</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px; max-height: clamp(340px, 45vh, 520px); overflow-y: auto;" id="account-tx-ledger">
+                <div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+                  <div style="font-size: 16px; margin-bottom: 6px;">💳 No Account Selected</div>
+                  <div style="font-size: 13px;">Click any account node on the graph or table to view its full transaction ledger.</div>
+                </div>
               </div>
             </div>
 
             <!-- Tab Panel: Connections -->
             <div id="panel-connections" style="display: none; margin-top: 18px;">
-              <div style="display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto;" id="account-connections-list">
-                <!-- Connected counterparties populated dynamically -->
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div>
+                  <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;" id="panel-connections-title">Connected Counterparties</div>
+                  <div style="font-size: 12px; color: var(--text-secondary);" id="panel-connections-subtitle">Direct accounts sending or receiving money with this account</div>
+                </div>
+                <span class="mono" id="panel-connections-count" style="font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(139, 92, 246, 0.2); color: #C4B5FD; font-weight: 600;">0 linked</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px; max-height: clamp(340px, 45vh, 520px); overflow-y: auto;" id="account-connections-list">
+                <div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+                  <div style="font-size: 16px; margin-bottom: 6px;">🔗 No Account Selected</div>
+                  <div style="font-size: 13px;">Click any account node on the graph or table to inspect its linked counterparties and transfer flows.</div>
+                </div>
               </div>
             </div>
 
@@ -606,6 +626,6 @@
 
   </main>
 
-  <script src="app.js?v=4.0"></script>
+  <script src="app.js?v=4.1"></script>
 </body>
 </html>

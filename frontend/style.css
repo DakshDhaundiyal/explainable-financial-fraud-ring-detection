@@ -78,7 +78,7 @@
   --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
   --shadow-hover: 0 12px 36px 0 rgba(0, 0, 0, 0.55), 0 0 24px rgba(139, 92, 246, 0.2);
 
-  --max-width: 1400px;
+  --max-width: 1680px;
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
 }
@@ -152,8 +152,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .header-container {
   max-width: var(--max-width);
+  width: 100%;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 clamp(16px, 3vw, 40px);
   min-height: 68px;
   display: flex;
   align-items: center;
@@ -270,8 +271,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
    ========================================================================== */
 .main-container {
   max-width: var(--max-width);
+  width: 100%;
   margin: 0 auto;
-  padding: 36px 32px 64px;
+  padding: clamp(20px, 3vh, 36px) clamp(16px, 3vw, 40px) 64px;
 }
 
 .tab-content {
@@ -305,9 +307,15 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .action-cards-grid {
   margin-top: 32px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 24px;
   align-items: stretch;
+}
+
+@media (max-width: 960px) {
+  .action-cards-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .action-card {
@@ -320,6 +328,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
   gap: 20px;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
@@ -371,11 +381,13 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   padding: 36px 24px;
   background: rgba(15, 12, 33, 0.45);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   transition: all 0.2s ease;
-  min-height: 190px;
+  flex: 1;
+  min-height: 240px;
 }
 
 .dropzone-box:hover {
@@ -459,8 +471,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   color: #94A3B8;
-  padding: 13px 18px;
-  border-radius: 14px;
+  padding: 12px 16px;
+  border-radius: 12px;
   font-size: 13.5px;
   font-weight: 600;
   text-align: left;
@@ -470,7 +482,6 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  gap: 12px;
 }
 
 .btn-demo-size:hover {
@@ -484,54 +495,6 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   border-color: #8B5CF6;
   color: #FFFFFF;
   box-shadow: 0 0 16px rgba(124, 58, 237, 0.25);
-}
-
-.demo-size-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-
-.demo-radio-circle {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-}
-
-.btn-demo-size.active .demo-radio-circle {
-  border-color: #A855F7;
-  background: #A855F7;
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.7);
-}
-
-.btn-demo-size.active .demo-radio-circle::after {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #FFFFFF;
-}
-
-.demo-chevron {
-  color: #64748B;
-  transition: transform 0.2s ease, color 0.2s ease;
-  flex-shrink: 0;
-}
-
-.btn-demo-size:hover .demo-chevron {
-  color: #A78BFA;
-  transform: translateX(2px);
-}
-
-.btn-demo-size.active .demo-chevron {
-  color: #C4B5FD;
 }
 
 /* Progress Trackers */
@@ -628,8 +591,15 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 .steps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .step-card {
@@ -645,6 +615,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   justify-content: space-between;
   box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
+  height: 100%;
 }
 
 .step-card:hover {
@@ -788,13 +759,27 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .tiles-grid {
   margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .tiles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .tiles-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .metric-tile {
   background: var(--bg-card);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
   padding: 22px 24px;
@@ -802,6 +787,10 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   position: relative;
   overflow: hidden;
   transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
 }
 
 .metric-tile:hover {
@@ -857,52 +846,56 @@ button:focus-visible, a:focus-visible, input:focus-visible {
    ========================================================================== */
 .investigation-grid {
   margin-top: 24px;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1.62fr) minmax(380px, 1fr);
   gap: 24px;
-  align-items: flex-start;
+  align-items: stretch;
   transition: all 0.35s ease;
 }
 
+@media (max-width: 1080px) {
+  .investigation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .graph-column {
-  flex: 1.8 1 680px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   min-width: 0;
   background: var(--bg-card);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-card);
-  padding: 24px;
+  padding: 24px 28px;
   box-shadow: var(--shadow-card);
-  transition: flex 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .account-column {
-  flex: 1 1 380px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   min-width: 0;
   background: var(--bg-card);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-card);
-  padding: 24px;
+  padding: 24px 28px;
   box-shadow: var(--shadow-card);
-  transition: flex 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s ease;
 }
 
 /* Focused Mode */
-.investigation-grid.graph-focused .graph-column {
-  flex: 1 1 100%;
-  width: 100%;
-  border-color: #8B5CF6;
-  box-shadow: 0 12px 36px rgba(139, 92, 246, 0.2);
+.investigation-grid.graph-focused {
+  grid-template-columns: 1fr;
 }
 
 .investigation-grid.graph-focused .graph-viewport-box {
-  height: 760px;
-}
-
-.investigation-grid.graph-focused .account-column {
-  flex: 1 1 100%;
-  width: 100%;
+  height: clamp(640px, 75vh, 920px);
 }
 
 .btn-focus-active {
@@ -1095,7 +1088,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   border: 1px solid rgba(139, 92, 246, 0.22);
   background: #080614;
   position: relative;
-  height: 600px;
+  flex: 1;
+  min-height: 520px;
+  height: clamp(520px, 60vh, 840px);
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8), 0 8px 32px rgba(0, 0, 0, 0.4);
   transition: height 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
 }
@@ -1266,6 +1261,22 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   color: #FFFFFF;
   font-weight: 700;
   box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4);
+}
+
+.subtab-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.25);
+  color: #C4B5FD;
+  margin-left: 4px;
+}
+
+.subtab-btn.active .subtab-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
 }
 
 /* Callout */
