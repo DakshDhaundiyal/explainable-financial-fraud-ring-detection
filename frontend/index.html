@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.0">
+  <link rel="stylesheet" href="style.css?v=4.0">
 </head>
 <body>
   <!-- TOP BAR NAVIGATION -->
@@ -35,10 +35,10 @@
         <button type="button" class="tab-btn" id="tab-compare-btn" data-target="tab-compare-content" aria-selected="false">Compare models</button>
       </nav>
 
-      <div class="header-status" style="display: flex; align-items: center; gap: 8px;">
+      <div class="header-status">
         <span class="status-dot"></span>
         <span>Model ready</span>
-        <span class="ai-status-badge" style="font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: #EEF2FF; color: #4338CA; font-weight: 600; border: 1px solid #C7D2FE;">✨ AI Explainer Active</span>
+        <span class="ai-status-badge">✨ AI Explainer Active</span>
       </div>
     </div>
   </header>
@@ -247,7 +247,7 @@
         </section>
 
         <!-- 3b. AI Investigation Executive Briefing (Prominent Full-Width Banner) -->
-        <div class="ai-batch-briefing-card" id="ai-batch-briefing-card" style="margin-top: 20px; padding: 18px 22px; border-radius: 14px; background: linear-gradient(135deg, #1E1B4B 0%, #312E81 100%); color: #FFFFFF; box-shadow: 0 4px 16px rgba(49, 46, 129, 0.2);">
+        <div class="ai-batch-briefing-card" id="ai-batch-briefing-card">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 18px;">✨</span>
@@ -363,7 +363,7 @@
               </div>
 
               <!-- AI Investigation Narrative & Network Analysis -->
-              <div class="ai-narrative-card" id="ai-narrative-card" style="margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: linear-gradient(135deg, rgba(238, 242, 255, 0.95), rgba(245, 243, 255, 0.95)); border: 1px solid #C7D2FE; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);">
+              <div class="ai-narrative-card" id="ai-narrative-card">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                   <div style="display: flex; align-items: center; gap: 6px;">
                     <span style="font-size: 16px;">✨</span>
@@ -377,10 +377,10 @@
                 <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(199, 210, 254, 0.6);">
                   <div style="font-size: 11.5px; font-weight: 600; color: #4F46E5; margin-bottom: 6px;">Ask AI about this account in plain English:</div>
                   <div style="display: flex; gap: 6px;">
-                    <input type="text" id="ai-ask-input" placeholder="e.g. What did this account do with the money?" style="flex: 1; padding: 7px 10px; font-size: 12px; border: 1px solid #C7D2FE; border-radius: 8px; outline: none; background: #FFFFFF; color: #1E1B4B;">
-                    <button type="button" id="ai-ask-btn" class="btn btn-primary btn-sm" style="padding: 0 12px; font-size: 12px; height: 32px; background: #4F46E5; border: none; color: #FFFFFF; border-radius: 8px; cursor: pointer; font-weight: 600;">Ask</button>
+                    <input type="text" id="ai-ask-input" placeholder="e.g. What did this account do with the money?" style="flex: 1; padding: 8px 12px; font-size: 12.5px; border: 1px solid #C7D2FE; border-radius: 8px; outline: none; background: #FFFFFF; color: #1E1B4B;">
+                    <button type="button" id="ai-ask-btn" class="btn btn-primary" style="padding: 0 14px; font-size: 12px; height: 34px;">Ask</button>
                   </div>
-                  <div id="ai-ask-answer" style="display: none; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #FFFFFF; border: 1px solid #E0E7FF; font-size: 12.5px; line-height: 1.5; color: #1E1B4B;"></div>
+                  <div id="ai-ask-answer" style="display: none; margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: #FFFFFF; border: 1px solid #E0E7FF; font-size: 13px; line-height: 1.5; color: #1E1B4B; box-shadow: 0 1px 3px rgba(0,0,0,0.05);"></div>
                 </div>
               </div>
 
@@ -441,7 +441,7 @@
         </div>
 
         <!-- 5. Accounts Ranked by Risk (Descending Table Explorer) -->
-        <section class="ranked-accounts-card" id="ranked-accounts-section" style="margin-top: 28px; background: var(--bg-card); border: 1px solid var(--border-card); border-radius: var(--radius-card); padding: 24px;">
+        <section class="ranked-accounts-card" id="ranked-accounts-section">
           <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 18px;">
             <div>
               <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
@@ -453,7 +453,7 @@
               </p>
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-              <input type="text" id="ranked-accounts-search" placeholder="Search account ID..." style="padding: 8px 12px; font-size: 13px; border: 1px solid var(--border-card); border-radius: 8px; width: 200px; background: #FFFFFF; color: var(--text-primary);">
+              <input type="text" id="ranked-accounts-search" placeholder="Search account ID..." style="padding: 8px 12px; font-size: 13px; border: 1px solid var(--border-card); border-radius: 8px; width: 220px; background: #FFFFFF; color: var(--text-primary);">
               <div class="filter-presets">
                 <button type="button" class="btn-filter-chip active" id="btn-rank-filter-all">All</button>
                 <button type="button" class="btn-filter-chip alert" id="btn-rank-filter-risk">High Risk</button>
@@ -466,15 +466,15 @@
           <!-- Table -->
           <div class="table-scroll" style="max-height: 480px; overflow-y: auto;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px;" id="ranked-accounts-table">
-              <thead style="position: sticky; top: 0; background: var(--bg-card); z-index: 2; border-bottom: 2px solid var(--border-card);">
+              <thead style="position: sticky; top: 0; background: #FFFFFF; z-index: 2; border-bottom: 2px solid var(--border-card);">
                 <tr>
-                  <th style="padding: 10px 14px; font-weight: 700; color: var(--text-muted); width: 60px;">Rank</th>
-                  <th style="padding: 10px 14px; font-weight: 700; color: var(--text-muted);">Account ID</th>
-                  <th style="padding: 10px 14px; font-weight: 700; color: var(--text-muted); width: 220px;">Risk Score</th>
-                  <th style="padding: 10px 14px; font-weight: 700; color: var(--text-muted); width: 140px;">Tier</th>
-                  <th style="padding: 10px 14px; font-weight: 700; color: var(--text-muted); width: 120px;">Connections</th>
-                  <th style="padding: 10px 14px; font-weight: 700; color: var(--text-muted); width: 140px;">Total Flow</th>
-                  <th style="padding: 10px 14px; font-weight: 700; color: var(--text-muted); text-align: right; width: 170px;">Explanation</th>
+                  <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted); width: 60px;">Rank</th>
+                  <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted);">Account ID</th>
+                  <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted); width: 220px;">Risk Score</th>
+                  <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted); width: 140px;">Tier</th>
+                  <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted); width: 120px;">Connections</th>
+                  <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted); width: 140px;">Total Flow</th>
+                  <th style="padding: 12px 14px; font-weight: 700; color: var(--text-muted); text-align: right; width: 170px;">Explanation</th>
                 </tr>
               </thead>
               <tbody id="ranked-accounts-tbody">
