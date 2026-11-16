@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.isPaused = true;
   }
 
+  initThemeToggle();
   initNavigation();
   initStartActions();
   initResultsActions();
@@ -54,6 +55,61 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('detect-state-a').style.display = 'block';
   document.getElementById('detect-state-b').style.display = 'none';
 });
+
+function initThemeToggle() {
+  const toggleBtn = document.getElementById('theme-toggle-btn');
+  const themeLabel = document.getElementById('theme-mode-text');
+  const metaColorScheme = document.querySelector('meta[name="color-scheme"]');
+
+  function updateThemeUI(theme) {
+    const isLight = theme === 'light';
+    if (themeLabel) {
+      themeLabel.textContent = isLight ? 'Light' : 'Dark';
+    }
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+      toggleBtn.classList.toggle('light-active', isLight);
+      toggleBtn.setAttribute('title', isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode');
+    }
+  }
+
+  let currentTheme = 'dark';
+  try {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark') {
+      currentTheme = saved;
+    }
+  } catch (e) {}
+
+  document.documentElement.setAttribute('data-theme', currentTheme);
+  if (metaColorScheme) metaColorScheme.content = currentTheme;
+  updateThemeUI(currentTheme);
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const isCurrentlyLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const targetTheme = isCurrentlyLight ? 'dark' : 'light';
+
+      document.documentElement.setAttribute('data-theme', targetTheme);
+      if (metaColorScheme) metaColorScheme.content = targetTheme;
+      try {
+        localStorage.setItem('theme', targetTheme);
+      } catch (e) {}
+
+      updateThemeUI(targetTheme);
+      drawCanvasGraph();
+    });
+  }
+
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'theme' && (e.newValue === 'light' || e.newValue === 'dark')) {
+      document.documentElement.setAttribute('data-theme', e.newValue);
+      if (metaColorScheme) metaColorScheme.content = e.newValue;
+      updateThemeUI(e.newValue);
+      drawCanvasGraph();
+    }
+  });
+}
 
 function initNavigation() {
   const detectBtn = document.getElementById('tab-detect-btn');
@@ -676,6 +732,11 @@ function initGraphCanvas() {
   const pauseBtn = document.getElementById('btn-pause-flow');
   const resetBtn = document.getElementById('btn-reset-view');
   const focusBtn = document.getElementById('btn-focus-graph');
+  const btnZoomIn = document.getElementById('btn-zoom-in');
+  const btnZoomOut = document.getElementById('btn-zoom-out');
+  const floatZoomIn = document.getElementById('float-zoom-in');
+  const floatZoomOut = document.getElementById('float-zoom-out');
+  const floatZoomReset = document.getElementById('float-zoom-reset');
 
   if (focusBtn) {
     focusBtn.addEventListener('click', toggleGraphFocus);
@@ -691,6 +752,33 @@ function initGraphCanvas() {
       loadGraphTopology();
     });
   }
+
+  if (btnZoomIn) btnZoomIn.addEventListener('click', () => zoomGraph(1.25));
+  if (btnZoomOut) btnZoomOut.addEventListener('click', () => zoomGraph(0.8));
+  if (floatZoomIn) floatZoomIn.addEventListener('click', () => zoomGraph(1.25));
+  if (floatZoomOut) floatZoomOut.addEventListener('click', () => zoomGraph(0.8));
+  if (floatZoomReset) {
+    floatZoomReset.addEventListener('click', () => {
+      state.transform = { x: 0, y: 0, scale: 1 };
+      loadGraphTopology();
+    });
+  }
+
+  // Keyboard accessibility for zoom and view reset
+  canvas.setAttribute('tabindex', '0');
+  canvas.addEventListener('keydown', (e) => {
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      zoomGraph(1.2);
+    } else if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      zoomGraph(0.8);
+    } else if (e.key === '0') {
+      e.preventDefault();
+      state.transform = { x: 0, y: 0, scale: 1 };
+      drawCanvasGraph();
+    }
+  });
 
   const box = document.querySelector('.graph-viewport-box');
   if (box) {
@@ -1216,6 +1304,7 @@ function getConnectedRingNodeIds(startId, activeEdges) {
 
 function drawCanvasGraph() {
   if (!ctx || !canvas) return;
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const width = canvas.width;
   const height = canvas.height;
 
@@ -1269,12 +1358,12 @@ function drawCanvasGraph() {
   if (visibleNodeIds.size === 0) {
     ctx.save();
     ctx.font = '600 15px Inter, sans-serif';
-    ctx.fillStyle = '#94A3B8';
+    ctx.fillStyle = isLight ? '#334155' : '#94A3B8';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`No connected accounts found with transaction risk score ≥ ${minFilter.toFixed(2)}`, width / 2, height / 2 - 12);
     ctx.font = '13px Inter, sans-serif';
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = isLight ? '#64748B' : '#64748B';
     ctx.fillText('Lower the risk slider above to view connected accounts.', width / 2, height / 2 + 14);
     ctx.restore();
     return;
@@ -1441,12 +1530,14 @@ function drawCanvasGraph() {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
-      // Text background outline for dark canvas readability
-      ctx.strokeStyle = '#080614';
+      // Text background outline for canvas readability
+      ctx.strokeStyle = isLight ? '#FFFFFF' : '#080614';
       ctx.lineWidth = 4;
       ctx.strokeText(n.id, n.x, n.y + n.radius + 6);
 
-      ctx.fillStyle = isSelected ? '#FFFFFF' : (isRisk ? '#FCA5A5' : '#CBD5E1');
+      ctx.fillStyle = isSelected 
+        ? (isLight ? '#0F172A' : '#FFFFFF') 
+        : (isRisk ? (isLight ? '#B91C1C' : '#FCA5A5') : (isLight ? '#334155' : '#CBD5E1'));
       ctx.fillText(n.id, n.x, n.y + n.radius + 6);
     }
   });
@@ -1465,16 +1556,16 @@ function drawCanvasGraph() {
     const bw = textWidth + 24;
     const bh = 32;
 
-    // Dark pill container
-    ctx.fillStyle = 'rgba(15, 12, 33, 0.92)';
+    // Pill container
+    ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 12, 33, 0.92)';
     ctx.beginPath();
     ctx.roundRect(bx, by, bw, bh, 8);
     ctx.fill();
-    ctx.strokeStyle = '#8B5CF6';
+    ctx.strokeStyle = isLight ? '#7C3AED' : '#8B5CF6';
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = isLight ? '#0F172A' : '#FFFFFF';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(bannerText, bx + 12, by + bh / 2);
@@ -1588,11 +1679,25 @@ function handleWheel(e) {
   e.preventDefault();
   const { screenX, screenY } = getMousePos(e);
   const factor = e.deltaY < 0 ? 1.1 : 0.9;
-  const newScale = Math.max(0.4, Math.min(2.5, state.transform.scale * factor));
+  const newScale = Math.max(0.3, Math.min(3.5, state.transform.scale * factor));
 
   state.transform.x = screenX - (screenX - state.transform.x) * (newScale / state.transform.scale);
   state.transform.y = screenY - (screenY - state.transform.y) * (newScale / state.transform.scale);
   state.transform.scale = newScale;
+}
+
+function zoomGraph(factor) {
+  if (!canvas) return;
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const currentScale = state.transform.scale || 1;
+  const newScale = Math.max(0.3, Math.min(3.5, currentScale * factor));
+  if (Math.abs(newScale - currentScale) < 0.001) return;
+
+  state.transform.x = cx - (cx - state.transform.x) * (newScale / currentScale);
+  state.transform.y = cy - (cy - state.transform.y) * (newScale / currentScale);
+  state.transform.scale = newScale;
+  drawCanvasGraph();
 }
 
 // ============================================================================
