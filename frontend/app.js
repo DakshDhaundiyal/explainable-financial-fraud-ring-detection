@@ -1254,12 +1254,12 @@ function drawCanvasGraph() {
   if (visibleNodeIds.size === 0) {
     ctx.save();
     ctx.font = '600 15px Inter, sans-serif';
-    ctx.fillStyle = '#4A5B72';
+    ctx.fillStyle = '#94A3B8';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`No connected accounts found with transaction risk score ≥ ${minFilter.toFixed(2)}`, width / 2, height / 2 - 12);
     ctx.font = '13px Inter, sans-serif';
-    ctx.fillStyle = '#8A97AB';
+    ctx.fillStyle = '#64748B';
     ctx.fillText('Lower the risk slider above to view connected accounts.', width / 2, height / 2 + 14);
     ctx.restore();
     return;
@@ -1281,7 +1281,7 @@ function drawCanvasGraph() {
 
       // Soft red halo
       const glow = ctx.createRadialGradient(rcx, rcy, rR - 35, rcx, rcy, rR + 35);
-      glow.addColorStop(0, 'rgba(239, 68, 68, 0.08)');
+      glow.addColorStop(0, 'rgba(239, 68, 68, 0.14)');
       glow.addColorStop(1, 'rgba(239, 68, 68, 0)');
       ctx.beginPath();
       ctx.arc(rcx, rcy, rR + 35, 0, Math.PI * 2);
@@ -1292,14 +1292,14 @@ function drawCanvasGraph() {
       ctx.beginPath();
       ctx.arc(rcx, rcy, rR, 0, Math.PI * 2);
       ctx.setLineDash([6, 6]);
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.setLineDash([]);
 
       // Ring title badge
       ctx.font = '600 11px Inter, sans-serif';
-      ctx.fillStyle = '#EF4444';
+      ctx.fillStyle = '#F87171';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText('⚡ DETECTED FRAUD RING (CIRCULAR FLOW & SMURFING HUB)', rcx, rcy - rR - 10);
@@ -1321,14 +1321,14 @@ function drawCanvasGraph() {
     ctx.lineTo(t.x, t.y);
 
     if (isSelectedEdge) {
-      ctx.strokeStyle = '#7C93C9';
+      ctx.strokeStyle = '#818CF8';
       ctx.lineWidth = 3.0;
     } else if (isHighRiskEdge) {
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
       ctx.lineWidth = 2.0;
     } else {
-      ctx.strokeStyle = '#C9D3E3';
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.28)';
+      ctx.lineWidth = 1.4;
     }
     ctx.stroke();
 
@@ -1343,7 +1343,7 @@ function drawCanvasGraph() {
     ctx.lineTo(arrowX - headLen * Math.cos(angle - Math.PI / 7), arrowY - headLen * Math.sin(angle - Math.PI / 7));
     ctx.lineTo(arrowX - headLen * Math.cos(angle + Math.PI / 7), arrowY - headLen * Math.sin(angle + Math.PI / 7));
     ctx.closePath();
-    ctx.fillStyle = isSelectedEdge ? '#7C93C9' : (isHighRiskEdge ? '#EF4444' : '#94A3B8');
+    ctx.fillStyle = isSelectedEdge ? '#818CF8' : (isHighRiskEdge ? '#EF4444' : 'rgba(129, 140, 248, 0.5)');
     ctx.fill();
 
     // Amount label on selected edge only
@@ -1351,7 +1351,7 @@ function drawCanvasGraph() {
       const mx = (s.x + t.x) / 2;
       const my = (s.y + t.y) / 2;
       ctx.font = '600 12px JetBrains Mono, monospace';
-      ctx.fillStyle = '#3B4C66';
+      ctx.fillStyle = '#C7D2FE';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText(`$${Number(edge.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, mx, my - 6);
@@ -1376,7 +1376,7 @@ function drawCanvasGraph() {
 
       ctx.beginPath();
       ctx.arc(px, py, isHighRiskEdge ? 4.0 : 3.0, 0, Math.PI * 2);
-      ctx.fillStyle = isHighRiskEdge ? '#EF4444' : '#2457D6';
+      ctx.fillStyle = isHighRiskEdge ? '#F87171' : '#38BDF8';
       ctx.fill();
     });
   }
@@ -1390,15 +1390,15 @@ function drawCanvasGraph() {
     const isRisk = n.is_flagged || (n.max_risk_score || 0) >= state.sessionThreshold;
     const isWatch = !isRisk && (n.max_risk_score || 0) >= 0.20;
 
-    let fillColor = '#3B6FE0'; // Normal
+    let fillColor = '#3B82F6'; // Normal
     if (isRisk) {
       if ((n.max_risk_score || 0) >= 0.85) {
-        fillColor = '#B42318'; // Deep crimson for severe ring core
+        fillColor = '#EF4444'; // Deep crimson for severe ring core
       } else {
-        fillColor = '#E0523B'; // Vibrant coral red for high risk
+        fillColor = '#F43F5E'; // Vibrant coral red for high risk
       }
     } else if (isWatch) {
-      fillColor = '#F2A33A'; // Amber/yellow for watch tier
+      fillColor = '#F59E0B'; // Amber/yellow for watch tier
     }
 
     // Pulsing Outer Ring on Selected Node
@@ -1406,7 +1406,7 @@ function drawCanvasGraph() {
       const pulse = Math.sin(now / 350) * 5;
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.radius + 9 + pulse, 0, Math.PI * 2);
-      ctx.strokeStyle = '#2457D6';
+      ctx.strokeStyle = '#818CF8';
       ctx.lineWidth = 2.5;
       ctx.stroke();
     }
@@ -1426,12 +1426,12 @@ function drawCanvasGraph() {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
-      // Text background for readability
-      ctx.strokeStyle = '#FBFCFE';
+      // Text background outline for dark canvas readability
+      ctx.strokeStyle = '#080614';
       ctx.lineWidth = 4;
       ctx.strokeText(n.id, n.x, n.y + n.radius + 6);
 
-      ctx.fillStyle = isSelected ? '#0F1B2D' : (isRisk ? '#B42318' : '#3B4C66');
+      ctx.fillStyle = isSelected ? '#FFFFFF' : (isRisk ? '#FCA5A5' : '#CBD5E1');
       ctx.fillText(n.id, n.x, n.y + n.radius + 6);
     }
   });
@@ -1451,15 +1451,15 @@ function drawCanvasGraph() {
     const bh = 32;
 
     // Dark pill container
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+    ctx.fillStyle = 'rgba(15, 12, 33, 0.92)';
     ctx.beginPath();
     ctx.roundRect(bx, by, bw, bh, 8);
     ctx.fill();
-    ctx.strokeStyle = '#6366F1';
+    ctx.strokeStyle = '#8B5CF6';
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    ctx.fillStyle = '#EEF2FF';
+    ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(bannerText, bx + 12, by + bh / 2);
@@ -1678,7 +1678,7 @@ function unselectAccountAndShowAll() {
   const driversContainer = document.getElementById('drivers-container');
   if (driversContainer) {
     driversContainer.innerHTML = `
-      <div style="padding: 12px; border-radius: 8px; background: #F8FAFC; border: 1px dashed var(--border-card); font-size: 13px; color: var(--text-muted); text-align: center;">
+      <div style="padding: 12px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-card); font-size: 13px; color: var(--text-muted); text-align: center;">
         Select an account to view what affected its score.
       </div>
     `;
@@ -1885,7 +1885,7 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
         const otherParty = isSender ? `To ${t.to_account}` : `From ${t.from_account}`;
         const tScore = Number(t.risk_score || 0);
         return `
-          <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: #FFFFFF;">
+          <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03);">
             <div>
               <div class="mono" style="font-weight: 600; font-size: 14px;">$${Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div class="mono" style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">${otherParty}</div>
@@ -1910,7 +1910,7 @@ function renderAccountDetails(acc, score, isRisk, isWatch) {
       connList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px;">No linked accounts.</div>`;
     } else {
       connList.innerHTML = conns.map((cp) => `
-        <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: #FFFFFF;">
+        <div style="padding: 12px 14px; border: 1px solid var(--border-card); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.03);">
           <div>
             <div class="mono" style="font-weight: 600; font-size: 14px; color: var(--accent);">${cp.account_id}</div>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
@@ -2238,7 +2238,7 @@ function renderRankedAccountsTable() {
         </td>
         <td>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="flex: 1; height: 7px; background: #E2E8F0; border-radius: 999px; overflow: hidden; max-width: 130px;">
+            <div style="flex: 1; height: 7px; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; max-width: 130px;">
               <div style="width: ${scorePct}%; height: 100%; background: ${barColor}; border-radius: 999px;"></div>
             </div>
             <span class="mono" style="font-weight: 700; font-size: 13px; color: ${barColor};">${score.toFixed(2)}</span>
@@ -2403,7 +2403,7 @@ async function loadComparisonMetrics() {
       <div class="model-card ${m.isOur ? 'tgat-featured' : ''}">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
           <span style="font-size: 18px; font-weight: 700;">${m.name}</span>
-          <span style="padding: 3px 10px; border-radius: 999px; background: ${m.isOur ? 'var(--accent)' : '#EDF0F5'}; color: ${m.isOur ? '#FFFFFF' : '#3B4C66'}; font-size: 12px; font-weight: 600;">${m.tag}</span>
+          <span style="padding: 3px 10px; border-radius: 999px; background: ${m.isOur ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)'}; color: ${m.isOur ? '#FFFFFF' : '#CBD5E1'}; font-size: 12px; font-weight: 600;">${m.tag}</span>
         </div>
         <p style="margin: 0; flex: 1; font-size: 14px; line-height: 1.55; color: var(--text-secondary);">${m.summary}</p>
         <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #3B4C66;">
@@ -2472,7 +2472,7 @@ async function loadComparisonMetrics() {
       <div class="table-row header">
         <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);">What we measured</div>
         ${models.map((m) => `
-          <div><span style="padding: 4px 12px; border-radius: var(--radius-pill); background: ${m.isOur ? 'var(--accent)' : '#EDF0F5'}; color: ${m.isOur ? '#FFFFFF' : '#3B4C66'}; font-size: 13px; font-weight: 600;">${m.name}</span></div>
+          <div><span style="padding: 4px 12px; border-radius: var(--radius-pill); background: ${m.isOur ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)'}; color: ${m.isOur ? '#FFFFFF' : '#CBD5E1'}; font-size: 13px; font-weight: 600;">${m.name}</span></div>
         `).join('')}
       </div>
     `;
