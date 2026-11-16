@@ -2418,7 +2418,7 @@ function renderRankedAccountsTable() {
         </td>
         <td>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="flex: 1; height: 7px; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; max-width: 130px;">
+            <div class="score-bar-track">
               <div style="width: ${scorePct}%; height: 100%; background: ${barColor}; border-radius: 999px;"></div>
             </div>
             <span class="mono" style="font-weight: 700; font-size: 13px; color: ${barColor};">${score.toFixed(2)}</span>
@@ -2583,10 +2583,10 @@ async function loadComparisonMetrics() {
       <div class="model-card ${m.isOur ? 'tgat-featured' : ''}">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
           <span style="font-size: 18px; font-weight: 700;">${m.name}</span>
-          <span style="padding: 3px 10px; border-radius: 999px; background: ${m.isOur ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)'}; color: ${m.isOur ? '#FFFFFF' : '#CBD5E1'}; font-size: 12px; font-weight: 600;">${m.tag}</span>
+          <span style="padding: 3px 10px; border-radius: 999px; background: ${m.isOur ? 'var(--accent)' : 'var(--nav-pill-bg)'}; color: ${m.isOur ? '#FFFFFF' : 'var(--text-secondary)'}; border: 1px solid ${m.isOur ? 'transparent' : 'var(--border-card)'}; font-size: 12px; font-weight: 600;">${m.tag}</span>
         </div>
         <p style="margin: 0; flex: 1; font-size: 14px; line-height: 1.55; color: var(--text-secondary);">${m.summary}</p>
-        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #3B4C66;">
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--text-secondary);">
           <div style="display: flex; align-items: center; gap: 8px;">
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${m.seesNetwork === 'Yes' ? '#0E7A4F' : '#6B7A90'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               ${m.seesNetwork === 'Yes' ? '<path d="M5 12.5l4.5 4.5L19 7.5"></path>' : '<path d="M6 12h12"></path>'}
@@ -2652,7 +2652,7 @@ async function loadComparisonMetrics() {
       <div class="table-row header">
         <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);">What we measured</div>
         ${models.map((m) => `
-          <div><span style="padding: 4px 12px; border-radius: var(--radius-pill); background: ${m.isOur ? 'var(--accent)' : 'rgba(255, 255, 255, 0.08)'}; color: ${m.isOur ? '#FFFFFF' : '#CBD5E1'}; font-size: 13px; font-weight: 600;">${m.name}</span></div>
+          <div><span style="padding: 4px 12px; border-radius: var(--radius-pill); background: ${m.isOur ? 'var(--accent)' : 'var(--nav-pill-bg)'}; color: ${m.isOur ? '#FFFFFF' : 'var(--text-secondary)'}; border: 1px solid ${m.isOur ? 'transparent' : 'var(--border-card)'}; font-size: 13px; font-weight: 600;">${m.name}</span></div>
         `).join('')}
       </div>
     `;
@@ -2676,7 +2676,7 @@ async function loadComparisonMetrics() {
             return `
               <div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 18px; font-weight: ${m.isOur ? '700' : '600'}; color: ${m.isOur ? 'var(--text-primary)' : '#3B4C66'};">${cfg.fmt(val)}</span>
+                  <span style="font-size: 18px; font-weight: ${m.isOur ? '700' : '600'}; color: ${m.isOur ? 'var(--text-primary)' : 'var(--text-secondary)'};">${cfg.fmt(val)}</span>
                   ${isWinner ? '<span class="best-badge">Best</span>' : ''}
                 </div>
                 <div class="metric-bar-track">

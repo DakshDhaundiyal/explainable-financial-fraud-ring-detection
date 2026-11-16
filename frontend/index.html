@@ -26,7 +26,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4.3">
+  <link rel="stylesheet" href="style.css?v=4.4">
 </head>
 <body>
   <!-- TOP BAR NAVIGATION -->
@@ -157,12 +157,12 @@
                   <div class="upload-progress-fill" id="upload-progress-bar" style="width: 0%;"></div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; gap: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-secondary); flex-wrap: wrap; gap: 6px;">
                   <span id="loading-file-info" style="display: flex; align-items: center; gap: 6px;">
                     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                    <span id="loading-filename-text">dataset.csv</span>
+                    <span id="loading-filename-text" style="font-weight: 600; color: var(--text-primary);">dataset.csv</span>
                   </span>
-                  <span id="loading-eta-label" style="font-weight: 500; color: #94A3B8;">Est. ~1.5s remaining</span>
+                  <span id="loading-eta-label" style="font-weight: 500; color: var(--text-secondary);">Est. ~1.5s remaining</span>
                 </div>
               </div>
 
@@ -270,7 +270,7 @@
           <div class="source-meta">
             <span class="source-pill" id="source-batch-pill">Benchmark Network</span>
             <span style="font-size: 15px; color: var(--text-secondary);" id="source-tx-count">282,877 transactions</span>
-            <span style="font-size: 15px; color: #8A97AB;" aria-hidden="true">·</span>
+            <span style="font-size: 15px; color: var(--text-muted);" aria-hidden="true">·</span>
             <span class="mono" style="font-size: 13px; color: var(--text-secondary);" id="source-session-id">ANL-IBM-FULL</span>
           </div>
           <div class="source-actions">
@@ -547,10 +547,10 @@
                   <div class="panel-section-title" id="panel-txs-title">Transactions Ledger</div>
                   <div style="font-size: 12px; color: var(--text-secondary);" id="panel-txs-subtitle">Inbound and outbound transfers for the selected account</div>
                 </div>
-                <span class="mono" id="panel-txs-count" style="font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(139, 92, 246, 0.2); color: #C4B5FD; font-weight: 600;">0 transfers</span>
+                <span class="mono count-pill" id="panel-txs-count">0 transfers</span>
               </div>
               <div style="display: flex; flex-direction: column; gap: 8px; max-height: clamp(340px, 45vh, 520px); overflow-y: auto;" id="account-tx-ledger">
-                <div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+                <div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: var(--bg-card-subtle);">
                   <div style="font-size: 16px; margin-bottom: 6px;">💳 No Account Selected</div>
                   <div style="font-size: 13px;">Click any account node on the graph or table to view its full transaction ledger.</div>
                 </div>
@@ -564,10 +564,10 @@
                   <div class="panel-section-title" id="panel-connections-title">Connected Counterparties</div>
                   <div style="font-size: 12px; color: var(--text-secondary);" id="panel-connections-subtitle">Direct accounts sending or receiving money with this account</div>
                 </div>
-                <span class="mono" id="panel-connections-count" style="font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: rgba(139, 92, 246, 0.2); color: #C4B5FD; font-weight: 600;">0 linked</span>
+                <span class="mono count-pill" id="panel-connections-count">0 linked</span>
               </div>
               <div style="display: flex; flex-direction: column; gap: 8px; max-height: clamp(340px, 45vh, 520px); overflow-y: auto;" id="account-connections-list">
-                <div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+                <div style="text-align: center; color: var(--text-muted); padding: 36px 16px; border: 1px dashed var(--border-card); border-radius: 12px; background: var(--bg-card-subtle);">
                   <div style="font-size: 16px; margin-bottom: 6px;">🔗 No Account Selected</div>
                   <div style="font-size: 13px;">Click any account node on the graph or table to inspect its linked counterparties and transfer flows.</div>
                 </div>
@@ -584,7 +584,7 @@
             <div>
               <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                 <span>Accounts Ranked by Risk (Descending)</span>
-                <span class="mono" id="table-account-count-badge" style="font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: rgba(139, 92, 246, 0.2); color: #C4B5FD;">-- accounts</span>
+                <span class="mono count-pill" id="table-account-count-badge">-- accounts</span>
               </h2>
               <p style="margin: 4px 0 0; font-size: 14px; color: var(--text-secondary);">
                 All accounts ordered from highest risk to lowest risk. Click any account to choose and view its explanation.
@@ -689,6 +689,6 @@
 
   </main>
 
-  <script src="app.js?v=4.3"></script>
+  <script src="app.js?v=4.4"></script>
 </body>
 </html>
