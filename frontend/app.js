@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGraphSlider();
   initSubtabs();
   initRankedAccountsEvents();
+  initAblationDrawer();
 
   // Start on State A by default so evaluator sees the front page first
   state.detectState = 'A';
@@ -2535,9 +2536,23 @@ async function loadComparisonMetrics() {
         fpr: tgatFrozen.false_positive_rate || 0.00211,
       },
       {
+        id: 'temporal_xgboost',
+        name: 'Temporal XGBoost',
+        tag: 'Enhanced ML',
+        isOur: false,
+        summary: 'Includes past transaction timing, but cannot trace multi-account network loops.',
+        seesNetwork: 'No',
+        seesTiming: 'Yes',
+        recall: baselines.temporal_xgboost?.test?.recall || 0.3223,
+        precision: baselines.temporal_xgboost?.test?.precision || 0.0445,
+        f1: baselines.temporal_xgboost?.test?.f1 || 0.0781,
+        rocAuc: baselines.temporal_xgboost?.test?.roc_auc || 0.9175,
+        fpr: baselines.temporal_xgboost?.test?.false_positive_rate || 0.00738,
+      },
+      {
         id: 'xgboost',
         name: 'XGBoost',
-        tag: 'Standard',
+        tag: 'Standard ML',
         isOur: false,
         summary: 'Judges each transaction on its own, without looking at who it connects to.',
         seesNetwork: 'No',
@@ -2556,25 +2571,25 @@ async function loadComparisonMetrics() {
         summary: 'Reads the network of accounts, but not the order in which things happen.',
         seesNetwork: 'Yes',
         seesTiming: 'No',
-        recall: baselines.static_gcn?.test?.recall || 0.242,
+        recall: baselines.static_gcn?.test?.recall || 0.2425,
         precision: baselines.static_gcn?.test?.precision || 0.0019,
         f1: baselines.static_gcn?.test?.f1 || 0.0038,
         rocAuc: baselines.static_gcn?.test?.roc_auc || 0.6064,
         fpr: baselines.static_gcn?.test?.false_positive_rate || 0.134,
       },
       {
-        id: 'temporal_xgboost',
-        name: 'Temporal XGBoost',
-        tag: 'Enhanced ML',
+        id: 'logistic_regression',
+        name: 'Logistic Reg.',
+        tag: 'Linear baseline',
         isOur: false,
-        summary: 'Includes past transaction timing, but cannot trace multi-account network loops.',
+        summary: 'Simple linear decision boundary. Suffers 93.4% false alarms under extreme class imbalance.',
         seesNetwork: 'No',
-        seesTiming: 'Yes',
-        recall: baselines.temporal_xgboost?.test?.recall || 0.585,
-        precision: baselines.temporal_xgboost?.test?.precision || 0.0416,
-        f1: baselines.temporal_xgboost?.test?.f1 || 0.0781,
-        rocAuc: baselines.temporal_xgboost?.test?.roc_auc || 0.9175,
-        fpr: baselines.temporal_xgboost?.test?.false_positive_rate || 0.0143,
+        seesTiming: 'No',
+        recall: baselines.logistic_regression?.test?.recall || 0.9967,
+        precision: baselines.logistic_regression?.test?.precision || 0.0011,
+        f1: baselines.logistic_regression?.test?.f1 || 0.0023,
+        rocAuc: baselines.logistic_regression?.test?.roc_auc || 0.827,
+        fpr: baselines.logistic_regression?.test?.false_positive_rate || 0.9337,
       },
     ];
 
@@ -2649,7 +2664,7 @@ async function loadComparisonMetrics() {
 
     // Build header row
     let tableHtml = `
-      <div class="table-row header">
+      <div class="table-row cols-${models.length} header">
         <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);">What we measured</div>
         ${models.map((m) => `
           <div><span style="padding: 4px 12px; border-radius: var(--radius-pill); background: ${m.isOur ? 'var(--accent)' : 'var(--nav-pill-bg)'}; color: ${m.isOur ? '#FFFFFF' : 'var(--text-secondary)'}; border: 1px solid ${m.isOur ? 'transparent' : 'var(--border-card)'}; font-size: 13px; font-weight: 600;">${m.name}</span></div>
@@ -2664,7 +2679,7 @@ async function loadComparisonMetrics() {
       const bestVal = cfg.higherIsBetter ? Math.max(...values) : Math.min(...values);
 
       tableHtml += `
-        <div class="table-row">
+        <div class="table-row cols-${models.length}">
           <div>
             <div style="font-size: 15px; font-weight: 600;">${cfg.label}</div>
             <div style="margin-top: 2px; font-size: 13px; color: var(--text-muted);">${cfg.tech}</div>
@@ -2695,6 +2710,96 @@ async function loadComparisonMetrics() {
     console.warn('Failed to load comparison metrics:', err);
     tableContainer.innerHTML = `<div style="padding: 24px; color: var(--text-muted); text-align: center;">Could not load evaluation benchmarks.</div>`;
   }
+}
+
+// ============================================================================
+// ABLATION STUDY DRAWER (15 RUNS)
+// ============================================================================
+
+function initAblationDrawer() {
+  const trigger = document.getElementById('btn-toggle-ablations');
+  const container = document.getElementById('ablation-full-table-container');
+  const arrow = document.getElementById('ablation-drawer-arrow');
+  const tbody = document.getElementById('ablation-table-tbody');
+
+  if (!trigger || !container) return;
+
+  let loaded = false;
+
+  trigger.addEventListener('click', async () => {
+    const isHidden = container.style.display === 'none' || container.style.display === '';
+    if (isHidden) {
+      container.style.display = 'block';
+      trigger.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
+
+      if (!loaded && tbody) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 24px; color: var(--text-muted);">Loading 15 controlled ablation runs from server...</td></tr>';
+        try {
+          const res = await fetch('/api/ablations');
+          if (!res.ok) throw new Error('Failed to fetch ablations');
+          const data = await res.json();
+          renderAblationTable(data.experiments || [], tbody);
+          loaded = true;
+        } catch (err) {
+          tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #EF4444; padding: 20px;">Failed to load ablation runs: ${err.message}</td></tr>`;
+        }
+      }
+    } else {
+      container.style.display = 'none';
+      trigger.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+    }
+  });
+}
+
+function renderAblationTable(experiments, tbody) {
+  if (!experiments || experiments.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No ablation experiments found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = experiments.map((exp) => {
+    const isControl = exp.id === 'a0_baseline_control';
+    const isFailed = (exp.test_f1 !== null && exp.test_f1 === 0) || exp.id === 'b_no_neighbors' || exp.id === 'd_no_time_encoding' || exp.id === 'c_neighbor_k/k_1';
+
+    let focusLabel = 'Baseline Control (Full Model)';
+    if (exp.id.includes('no_neighbors')) focusLabel = 'Remove Graph Neighbors (Isolated Nodes)';
+    else if (exp.id.includes('no_time_encoding')) focusLabel = 'Remove Time Encoding (Bochner)';
+    else if (exp.id.includes('no_temporal_features')) focusLabel = 'Remove Temporal History Features';
+    else if (exp.id.includes('neighbor_k/k_1')) focusLabel = 'Neighbor Budget K = 1 (Minimal)';
+    else if (exp.id.includes('neighbor_k/k_5')) focusLabel = 'Neighbor Budget K = 5';
+    else if (exp.id.includes('neighbor_k/k_10')) focusLabel = 'Neighbor Budget K = 10 (Selected)';
+    else if (exp.id.includes('neighbor_k/k_20')) focusLabel = 'Neighbor Budget K = 20 (Deep)';
+    else if (exp.id.includes('one_layer')) focusLabel = 'Architecture: 1 TGAT Layer';
+    else if (exp.id.includes('one_head')) focusLabel = 'Architecture: 1 Attention Head';
+    else if (exp.id.includes('hidden_16')) focusLabel = 'Architecture: Hidden Dim = 16';
+    else if (exp.id.includes('hidden_64')) focusLabel = 'Architecture: Hidden Dim = 64';
+    else if (exp.id.includes('dropout_04')) focusLabel = 'Regularization: High Dropout (0.4)';
+    else if (exp.id.includes('dropout_0')) focusLabel = 'Regularization: No Dropout (0.0)';
+
+    const f1Formatted = exp.test_f1 !== null && exp.test_f1 !== undefined ? exp.test_f1.toFixed(4) : '—';
+    const testRocFormatted = exp.test_roc_auc !== null && exp.test_roc_auc !== undefined ? exp.test_roc_auc.toFixed(4) : '—';
+    const testPrFormatted = exp.test_pr_auc !== null && exp.test_pr_auc !== undefined ? exp.test_pr_auc.toFixed(4) : '—';
+    const valRocFormatted = exp.val_roc_auc !== null && exp.val_roc_auc !== undefined ? exp.val_roc_auc.toFixed(4) : '—';
+    const valPrFormatted = exp.val_pr_auc !== null && exp.val_pr_auc !== undefined ? exp.val_pr_auc.toFixed(4) : '—';
+
+    return `
+      <tr style="${isControl ? 'background: rgba(99, 102, 241, 0.08); font-weight: 600;' : ''}">
+        <td class="mono" style="font-size: 12px; color: ${isControl ? 'var(--accent)' : 'var(--text-primary)'};">${exp.id} ${isControl ? '★' : ''}</td>
+        <td><span style="font-weight: 600; color: ${isFailed ? '#EF4444' : 'var(--text-primary)'};">${focusLabel}</span></td>
+        <td class="mono">${exp.neighbor_k}</td>
+        <td class="mono">${exp.num_layers}L / ${exp.num_heads}H</td>
+        <td class="mono">${valRocFormatted}</td>
+        <td class="mono">${valPrFormatted}</td>
+        <td class="mono" style="font-weight: 600;">${testRocFormatted}</td>
+        <td class="mono" style="font-weight: 600;">${testPrFormatted}</td>
+        <td class="mono" style="font-weight: 700; color: ${isFailed ? '#EF4444' : 'var(--text-primary)'};">${f1Formatted} ${isFailed ? '<span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(239, 68, 68, 0.15); color: #EF4444; margin-left: 4px;">Collapses</span>' : ''}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // ============================================================================

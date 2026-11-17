@@ -1978,7 +1978,7 @@ input:focus-visible {
 }
 
 .benchmark-table-grid {
-  min-width: 860px;
+  min-width: 960px;
 }
 
 .table-row {
@@ -1988,6 +1988,10 @@ input:focus-visible {
   align-items: center;
   padding: 16px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.table-row.cols-5 {
+  grid-template-columns: minmax(220px, 1.4fr) repeat(5, minmax(115px, 1fr));
 }
 
 .table-row.header {
@@ -2686,6 +2690,529 @@ input:focus-visible {
 [data-theme="light"] .compare-hero-banner {
   background: linear-gradient(135deg, #4338CA 0%, #3730A3 60%, #312E81 100%);
   color: #FFFFFF;
+}
+
+/* ==========================================================================
+   THRESHOLD OPERATING POINTS (SLIDE 07)
+   ========================================================================== */
+.threshold-section {
+  margin-top: 32px;
+}
+
+.threshold-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.threshold-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.threshold-pill-stat {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--nav-pill-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-card);
+}
+
+.threshold-comparison-wrap {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.threshold-card {
+  flex: 1 1 340px;
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.threshold-card:hover {
+  border-color: var(--border-card-hover);
+  transform: translateY(-2px);
+}
+
+.threshold-card.default {
+  border-color: var(--border-card);
+}
+
+.threshold-card.tuned {
+  border: 2px solid var(--accent);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, var(--bg-card) 100%);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+}
+
+.threshold-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.threshold-title-badge {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+}
+
+.threshold-card.default .threshold-title-badge {
+  background: var(--nav-pill-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-card);
+}
+
+.threshold-card.tuned .threshold-title-badge {
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+.threshold-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.threshold-stat-box {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.threshold-stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.threshold-stat-num {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.threshold-delta-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
+.threshold-delta-tag.good {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.threshold-delta-tag.neutral {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-card);
+}
+
+.threshold-role-desc {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-card);
+  padding-top: 14px;
+}
+
+.threshold-connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.threshold-arrow-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  font-size: 20px;
+}
+
+/* Takeaways Callout Box */
+.threshold-takeaways-card {
+  margin-top: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 22px 26px;
+}
+
+.threshold-takeaways-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.threshold-takeaways-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px 24px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.threshold-takeaway-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.threshold-takeaway-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+/* ==========================================================================
+   ABLATION STUDY (15 CONTROLLED EXPERIMENTS)
+   ========================================================================== */
+.ablation-section {
+  margin-top: 36px;
+}
+
+.ablation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.ablation-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.ablation-card:hover {
+  border-color: var(--border-card-hover);
+  transform: translateY(-2px);
+}
+
+.ablation-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 5px;
+}
+
+.ablation-card.orange::before {
+  background: #F97316;
+}
+
+.ablation-card.red::before {
+  background: #EF4444;
+}
+
+.ablation-card.purple::before {
+  background: #8B5CF6;
+}
+
+.ablation-card.teal::before {
+  background: #14B8A6;
+}
+
+.ablation-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.ablation-metric-badge {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.ablation-card.red .ablation-metric-badge {
+  color: #EF4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.ablation-card.orange .ablation-metric-badge {
+  color: #F97316;
+  background: rgba(249, 115, 22, 0.1);
+}
+
+.ablation-card.purple .ablation-metric-badge {
+  color: #A855F7;
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.ablation-card.teal .ablation-metric-badge {
+  color: #14B8A6;
+  background: rgba(20, 184, 166, 0.1);
+}
+
+.ablation-card-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.ablation-footnote {
+  margin-top: 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* 15 Ablation Experiments Collapsible Drawer */
+.ablation-drawer-wrap {
+  margin-top: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.ablation-drawer-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--bg-card-subtle);
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ablation-drawer-trigger:hover {
+  background: var(--bg-card-hover);
+}
+
+.ablation-drawer-trigger.open {
+  border-bottom-color: var(--border-card);
+}
+
+.ablation-table-scroll {
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.ablation-full-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.ablation-full-table th {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-card);
+  background: var(--bg-card-subtle);
+  white-space: nowrap;
+}
+
+.ablation-full-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-card);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ablation-full-table tr:hover {
+  background: var(--bg-card-hover);
+}
+
+/* LIGHT MODE OVERRIDES FOR THRESHOLD & ABLATIONS */
+:root[data-theme="light"] .threshold-card.tuned,
+[data-theme="light"] .threshold-card.tuned {
+  background: linear-gradient(180deg, rgba(79, 70, 229, 0.05) 0%, #FFFFFF 100%);
+  border-color: #6366F1;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.12);
+}
+
+:root[data-theme="light"] .threshold-stat-box,
+[data-theme="light"] .threshold-stat-box {
+  background: #F8FAFC;
+  border-color: #E2E8F0;
+}
+
+:root[data-theme="light"] .threshold-stat-num,
+[data-theme="light"] .threshold-stat-num {
+  color: #0F172A;
+}
+
+:root[data-theme="light"] .threshold-card.tuned .threshold-stat-num,
+[data-theme="light"] .threshold-card.tuned .threshold-stat-num {
+  color: #1E1B4B;
+}
+
+:root[data-theme="light"] .threshold-takeaways-card,
+[data-theme="light"] .threshold-takeaways-card {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+}
+
+:root[data-theme="light"] .threshold-takeaway-icon,
+[data-theme="light"] .threshold-takeaway-icon {
+  background: rgba(79, 70, 229, 0.12);
+  color: #4338CA;
+}
+
+:root[data-theme="light"] .ablation-card,
+[data-theme="light"] .ablation-card {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+}
+
+:root[data-theme="light"] .ablation-card-title,
+[data-theme="light"] .ablation-card-title {
+  color: #0F172A;
+}
+
+:root[data-theme="light"] .ablation-metric-badge,
+[data-theme="light"] .ablation-metric-badge {
+  color: #4338CA;
+  background: rgba(67, 56, 202, 0.08);
+}
+
+:root[data-theme="light"] .ablation-card.red .ablation-metric-badge,
+[data-theme="light"] .ablation-card.red .ablation-metric-badge {
+  color: #DC2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+:root[data-theme="light"] .ablation-card.orange .ablation-metric-badge,
+[data-theme="light"] .ablation-card.orange .ablation-metric-badge {
+  color: #D97706;
+  background: rgba(217, 119, 6, 0.08);
+}
+
+:root[data-theme="light"] .ablation-card.purple .ablation-metric-badge,
+[data-theme="light"] .ablation-card.purple .ablation-metric-badge {
+  color: #7C3AED;
+  background: rgba(124, 58, 237, 0.08);
+}
+
+:root[data-theme="light"] .ablation-card.teal .ablation-metric-badge,
+[data-theme="light"] .ablation-card.teal .ablation-metric-badge {
+  color: #0D9488;
+  background: rgba(13, 148, 136, 0.08);
+}
+
+:root[data-theme="light"] .ablation-drawer-wrap,
+[data-theme="light"] .ablation-drawer-wrap {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+}
+
+:root[data-theme="light"] .ablation-drawer-trigger,
+[data-theme="light"] .ablation-drawer-trigger {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+:root[data-theme="light"] .ablation-drawer-trigger:hover,
+[data-theme="light"] .ablation-drawer-trigger:hover {
+  background: #F1F5F9;
+}
+
+:root[data-theme="light"] .ablation-full-table th,
+[data-theme="light"] .ablation-full-table th {
+  background: #F1F5F9;
+  color: #475569;
+  border-color: #E2E8F0;
+}
+
+:root[data-theme="light"] .ablation-full-table td,
+[data-theme="light"] .ablation-full-table td {
+  border-color: #E2E8F0;
+  color: #1E293B;
+}
+
+:root[data-theme="light"] .ablation-full-table tr:hover,
+[data-theme="light"] .ablation-full-table tr:hover {
+  background: #F8FAFC;
 }
 
 /* ==========================================================================
